@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Letras & Sobres</title>
+    <!-- Tailwind CSS para diseño moderno -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Quill.js para el editor de texto enriquecido -->
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+    <!-- FontAwesome para iconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Ajustes para el editor de texto */
+        .ql-container { font-size: 16px; font-family: inherit; }
+        .ql-editor { min-height: 150px; }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans">
+
+    <!-- Navegación Superior -->
+    <nav class="bg-slate-800 text-white p-4 shadow-lg flex justify-between items-center sticky top-0 z-10">
+        <h1 class="text-2xl font-bold tracking-wide"><i class="fa-solid fa-envelope-open-text text-amber-400 mr-2"></i> Letras & Sobres</h1>
+        <div id="auth-section">
+            <button id="btn-login" class="bg-amber-500 text-slate-900 px-5 py-2 rounded-lg font-bold hover:bg-amber-400 transition shadow">Iniciar Sesión</button>
+            <button id="btn-logout" class="hidden bg-slate-600 text-white px-5 py-2 rounded-lg font-semibold hover:bg-slate-500 transition shadow">Cerrar Sesión</button>
+        </div>
+    </nav>
+
+    <div class="flex flex-col md:flex-row min-h-[calc(100vh-72px)]">
+        
+        <!-- PANEL DE ADMINISTRADOR (Visible solo para gregoryplaza4@gmail.com) -->
+        <aside id="admin-panel" class="hidden w-full md:w-1/3 lg:w-1/4 bg-white shadow-xl p-6 border-r border-gray-200 overflow-y-auto">
+            <h2 class="text-xl font-bold mb-6 text-slate-800 border-b pb-2"><i class="fa-solid fa-pen-nib text-amber-500 mr-2"></i> Panel de Edición</h2>
+            
+            <!-- Crear Nuevo Sobre (Autor) -->
+            <div class="mb-8 p-4 bg-slate-50 rounded-xl border border-slate-200 shadow-sm">
+                <h3 class="font-bold text-sm text-slate-500 uppercase mb-3">1. Crear Nuevo Autor</h3>
+                <input type="text" id="author-name" placeholder="Ej. Mario Benedetti" class="w-full p-2 border border-gray-300 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-amber-400">
+                <button id="btn-add-author" class="w-full bg-slate-800 text-white py-2 rounded-lg hover:bg-slate-700 transition font-semibold"><i class="fa-solid fa-plus mr-2"></i>Crear Sobre</button>
+            </div>
+
+            <!-- Agregar Cartilla -->
+            <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 shadow-sm">
+                <h3 class="font-bold text-sm text-slate-500 uppercase mb-3">2. Agregar Cartilla</h3>
+                
+                <select id="select-author" class="w-full p-2 border border-gray-300 rounded-lg mb-4 bg-white">
+                    <option value="">Selecciona un Autor...</option>
+                </select>
+                
+                <!-- Subida de imagen -->
+                <label class="block mb-1 text-sm font-semibold text-gray-700">Fotografía (Opcional)</label>
+                <div class="flex items-center justify-center w-full mb-4">
+                    <label class="flex flex-col items-center justify-center w-full h-28 border-2 border-amber-300 border-dashed rounded-lg cursor-pointer bg-white hover:bg-amber-50 transition">
+                        <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                            <i class="fa-solid fa-image text-2xl text-amber-500 mb-2"></i>
+                            <p class="text-xs text-gray-500">Clic para subir imagen</p>
+                        </div>
+                        <input id="card-image" type="file" class="hidden" accept="image/*" />
+                    </label>
+                </div>
+
+                <!-- Editor de texto enriquecido -->
+                <label class="block mb-1 text-sm font-semibold text-gray-700">Texto de la Cartilla</label>
+                <div class="bg-white rounded-lg mb-4 border border-gray-300">
+                    <div id="editor" class="rounded-b-lg"></div>
+                </div>
+
+                <button id="btn-add-card" class="w-full bg-amber-500 text-slate-900 py-3 rounded-lg hover:bg-amber-400 transition shadow-md font-bold text-lg"><i class="fa-solid fa-paper-plane mr-2"></i>Guardar Cartilla</button>
+            </div>
+        </aside>
+
+        <!-- VISTA PRINCIPAL (Para todos) -->
+        <main class="flex-1 p-6 md:p-10 bg-slate-100">
+            <h2 class="text-3xl font-bold mb-8 text-slate-800 border-l-4 border-amber-500 pl-4">Colección de Autores</h2>
+            
+            <!-- Grid de Sobres -->
+            <div id="envelopes-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                <!-- Se inyectan con JS -->
+            </div>
+
+            <!-- Buzón de Sugerencias (Para Invitados) -->
+            <div id="guest-suggestions" class="hidden mt-16 max-w-2xl mx-auto p-6 bg-white shadow-lg rounded-2xl border border-gray-200">
+                <h3 class="text-xl font-bold mb-2 text-slate-800"><i class="fa-solid fa-lightbulb text-amber-500 mr-2"></i> Buzón de Sugerencias</h3>
+                <p class="text-gray-600 mb-4 text-sm">¿Te gustaría ver a algún autor en particular o sugerir una frase? Escríbelo aquí.</p>
+                <textarea id="suggestion-text" rows="3" class="w-full p-3 border border-gray-300 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-amber-400" placeholder="Escribe tu sugerencia..."></textarea>
+                <button id="btn-send-suggestion" class="bg-slate-800 text-white px-6 py-2 rounded-lg hover:bg-slate-700 transition font-semibold">Enviar Sugerencia</button>
+            </div>
+        </main>
+    </div>
+
+    <!-- VENTANA EMERGENTE (Modal para leer cartillas) -->
+    <div id="modal-cards" class="hidden fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden relative">
+            <button id="btn-close-modal" class="absolute top-4 right-4 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-full w-8 h-8 flex items-center justify-center transition z-10">
+                <i class="fa-solid fa-times"></i>
+            </button>
+            
+            <div class="bg-slate-800 text-white p-6 text-center">
+                <h2 id="modal-author-name" class="text-3xl font-bold font-serif">Nombre del Autor</h2>
+            </div>
+            
+            <div id="modal-content" class="p-6 overflow-y-auto bg-slate-50 flex-1 space-y-6">
+                <!-- Las cartillas se inyectan aquí -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Script de lógica -->
+    <script type="module" src="app.js"></script>
+</body>
+</html>
