@@ -28,7 +28,7 @@ let idCartillaEditando = null;
 let idAutorEditando = null;
 let imagenActualEditando = null; 
 
-let idAutorPanelEditando = null; // Para editar el autor en sí
+let idAutorPanelEditando = null; 
 let imagenAutorActualEditando = null;
 
 // 4. Inicializar Editor de Texto (Quill)
@@ -235,37 +235,24 @@ document.getElementById('btn-add-author').addEventListener('click', async () => 
         }
 
         if(idAutorPanelEditando) {
-            // MODO EDICIÓN DE AUTOR
             let datosActualizados = { nombre: input.value.trim() };
-            if (imageUrl) {
-                datosActualizados.imagenAutor = imageUrl;
-            } else {
-                datosActualizados.imagenAutor = imagenAutorActualEditando;
-            }
+            if (imageUrl) { datosActualizados.imagenAutor = imageUrl; } 
+            else { datosActualizados.imagenAutor = imagenAutorActualEditando; }
+            
             await updateDoc(doc(db, `autores/${idAutorPanelEditando}`), datosActualizados);
             alert('Autor actualizado correctamente.');
             idAutorPanelEditando = null;
             document.getElementById('titulo-panel-autor').textContent = '1. Crear Nuevo Autor';
             btnCancelAuthor.classList.add('hidden');
         } else {
-            // MODO CREACIÓN
-            await addDoc(collection(db, "autores"), { 
-                nombre: input.value.trim(), 
-                imagenAutor: imageUrl,
-                fechaCreacion: new Date() 
-            });
+            await addDoc(collection(db, "autores"), { nombre: input.value.trim(), imagenAutor: imageUrl, fechaCreacion: new Date() });
             alert('Autor creado exitosamente.');
         }
         
         input.value = ''; 
         resetearCajaImagenAutor();
-    } catch (error) { 
-        alert('Error al guardar autor.'); 
-        console.error(error);
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-plus mr-2"></i>Crear Autor';
-    }
+    } catch (error) { alert('Error al guardar autor.'); } 
+    finally { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-plus mr-2"></i>Crear Autor'; }
 });
 
 // B) Guardar o Actualizar Cartilla
@@ -362,7 +349,6 @@ onSnapshot(query(collection(db, "autores"), orderBy("fechaCreacion", "asc")), (s
         grid.appendChild(envelopeDiv);
     });
 
-    // Lógica para Eliminar Autor
     document.querySelectorAll('.btn-eliminar-autor').forEach(btn => {
         btn.addEventListener('click', async (e) => {
             e.stopPropagation();
@@ -370,24 +356,18 @@ onSnapshot(query(collection(db, "autores"), orderBy("fechaCreacion", "asc")), (s
             if(confirm('¿Seguro que deseas eliminar a este autor y TODAS sus cartillas? Esta acción es permanente.')) {
                 try {
                     const cartillasSnap = await getDocs(collection(db, `autores/${aId}/cartillas`));
-                    cartillasSnap.forEach(async (cDoc) => {
-                        await deleteDoc(doc(db, `autores/${aId}/cartillas/${cDoc.id}`));
-                    });
+                    cartillasSnap.forEach(async (cDoc) => { await deleteDoc(doc(db, `autores/${aId}/cartillas/${cDoc.id}`)); });
                     await deleteDoc(doc(db, `autores/${aId}`));
                     alert('Autor y cartillas eliminados.');
-                } catch (error) {
-                    alert('Error al eliminar autor.');
-                }
+                } catch (error) { alert('Error al eliminar autor.'); }
             }
         });
     });
 
-    // Lógica para Editar Autor
     document.querySelectorAll('.btn-editar-autor').forEach(btn => {
         btn.addEventListener('click', async (e) => {
             e.stopPropagation();
             const aId = e.currentTarget.dataset.autor;
-            
             try {
                 const aSnap = await getDoc(doc(db, `autores/${aId}`));
                 const aData = aSnap.data();
@@ -405,15 +385,11 @@ onSnapshot(query(collection(db, "autores"), orderBy("fechaCreacion", "asc")), (s
                     filePreviewAutor.classList.remove('hidden');
                     filePreviewAutor.classList.add('flex');
                     btnRemoveImageAutor.classList.remove('hidden');
-                } else {
-                    resetearCajaImagenAutor();
-                }
+                } else { resetearCajaImagenAutor(); }
 
                 document.getElementById('btn-add-author').innerHTML = '<i class="fa-solid fa-save mr-2"></i>Actualizar Autor';
                 window.scrollTo({ top: 0, behavior: 'smooth' });
-            } catch (error) {
-                alert('Error al preparar la edición del autor.');
-            }
+            } catch (error) { alert('Error al preparar la edición del autor.'); }
         });
     });
 });
@@ -438,7 +414,6 @@ async function abrirSobre(autorId, autorNombre) {
             const cartilla = docSnap.data();
             
             let cardHtml = `<div class="bg-white p-6 rounded-xl shadow-md border border-gray-100 mb-6 relative pt-14">`; 
-            
             if(isAdmin) {
                 cardHtml += `
                 <div class="absolute top-3 right-3 flex space-x-2">
@@ -450,7 +425,6 @@ async function abrirSobre(autorId, autorNombre) {
                     </button>
                 </div>`;
             }
-
             if (cartilla.imagen) cardHtml += `<img src="${cartilla.imagen}" class="w-full max-h-96 object-contain rounded-lg mb-4 bg-gray-100">`;
             if (cartilla.texto) cardHtml += `<div class="ql-editor p-0">${cartilla.texto}</div>`;
             cardHtml += `</div>`;
@@ -489,9 +463,7 @@ async function abrirSobre(autorId, autorNombre) {
                     filePreview.classList.remove('hidden');
                     filePreview.classList.add('flex');
                     btnRemoveImage.classList.remove('hidden');
-                } else {
-                    resetearCajaImagen();
-                }
+                } else { resetearCajaImagen(); }
 
                 document.getElementById('btn-add-card').innerHTML = '<i class="fa-solid fa-save mr-2"></i>Actualizar Cartilla';
                 modal.classList.add('hidden');
@@ -502,12 +474,75 @@ async function abrirSobre(autorId, autorNombre) {
 }
 document.getElementById('btn-close-modal').addEventListener('click', () => document.getElementById('modal-cards').classList.add('hidden'));
 
-// 9. Enviar Sugerencias
+// 9. Enviar y LEER Sugerencias
 document.getElementById('btn-send-suggestion').addEventListener('click', async () => {
     const text = document.getElementById('suggestion-text').value;
     if (!text.trim()) return alert('Por favor escribe algo primero.');
     try {
-        await addDoc(collection(db, "sugerencias"), { texto: text, usuario: auth.currentUser.email, fecha: new Date() });
-        document.getElementById('suggestion-text').value = ''; alert('Sugerencia enviada.');
-    } catch (error) { alert('Error al enviar.'); }
+        await addDoc(collection(db, "sugerencias"), { texto: text, usuario: auth.currentUser ? auth.currentUser.email : 'Anónimo', fecha: new Date() });
+        document.getElementById('suggestion-text').value = ''; alert('¡Sugerencia enviada!');
+    } catch (error) { alert('Error al enviar la sugerencia.'); }
+});
+
+// NUEVO: Botón para abrir el panel de Sugerencias y funcionalidad de ELIMINAR
+document.getElementById('btn-open-suggestions').addEventListener('click', async () => {
+    const modalSug = document.getElementById('modal-suggestions');
+    const contentSug = document.getElementById('suggestions-content');
+    modalSug.classList.remove('hidden');
+    contentSug.innerHTML = '<div class="text-center py-10"><i class="fa-solid fa-spinner fa-spin text-3xl text-indigo-500"></i></div>';
+
+    try {
+        const querySnapshot = await getDocs(query(collection(db, "sugerencias"), orderBy("fecha", "desc")));
+        contentSug.innerHTML = '';
+        if (querySnapshot.empty) {
+            contentSug.innerHTML = '<p class="text-center py-10 text-gray-400">El buzón está vacío por ahora.</p>';
+            return;
+        }
+
+        querySnapshot.forEach((docSnap) => {
+            const sug = docSnap.data();
+            const fechaString = sug.fecha ? sug.fecha.toDate().toLocaleDateString() : 'Fecha desconocida';
+            
+            contentSug.innerHTML += `
+                <div class="bg-white p-5 rounded-xl shadow border border-gray-100 text-left relative">
+                    
+                    <button class="btn-eliminar-sugerencia absolute top-4 right-4 bg-red-100 text-red-600 w-8 h-8 rounded-full active:bg-red-300 hover:bg-red-200 transition flex items-center justify-center shadow" data-id="${docSnap.id}" title="Eliminar Sugerencia">
+                        <i class="fa-solid fa-trash text-xs"></i>
+                    </button>
+                    
+                    <div class="flex justify-between items-start mb-3 border-b border-gray-100 pb-2 pr-10">
+                        <span class="text-sm font-bold text-slate-700 truncate"><i class="fa-solid fa-user text-indigo-400 mr-2"></i>${sug.usuario || 'Anónimo'}</span>
+                        <span class="text-xs text-gray-400 whitespace-nowrap ml-2"><i class="fa-regular fa-clock mr-1"></i>${fechaString}</span>
+                    </div>
+                    
+                    <p class="text-gray-700 text-sm whitespace-pre-wrap leading-relaxed">${sug.texto}</p>
+                </div>
+            `;
+        });
+
+        // Eventos para el nuevo botón de eliminar sugerencias
+        document.querySelectorAll('.btn-eliminar-sugerencia').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const sId = e.currentTarget.dataset.id;
+                if(confirm('¿Estás seguro de que deseas eliminar esta sugerencia?')) {
+                    try {
+                        await deleteDoc(doc(db, `sugerencias/${sId}`));
+                        // Simula un clic en el botón de abrir para recargar el panel mágicamente
+                        document.getElementById('btn-open-suggestions').click(); 
+                    } catch (error) {
+                        alert('Error al eliminar la sugerencia.');
+                    }
+                }
+            });
+        });
+
+    } catch (error) {
+        contentSug.innerHTML = '<p class="text-red-500 text-center py-10">Error al leer las sugerencias de la base de datos.</p>';
+        console.error(error);
+    }
+});
+
+// Cerrar panel de sugerencias
+document.getElementById('btn-close-suggestions').addEventListener('click', () => {
+    document.getElementById('modal-suggestions').classList.add('hidden');
 });

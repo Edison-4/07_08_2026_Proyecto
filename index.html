@@ -85,7 +85,7 @@
     <!-- PÁGINA PRINCIPAL Y PANEL -->
     <div class="flex flex-col md:flex-row min-h-[calc(100vh-72px)]">
         
-        <!-- PANEL DE EDICIÓN -->
+        <!-- PANEL DE EDICIÓN (ADMIN) -->
         <aside id="admin-panel" class="hidden w-full md:w-1/3 lg:w-1/4 bg-white shadow-xl p-6 border-r border-gray-200 overflow-y-auto">
             <h2 class="text-xl font-bold mb-6 text-slate-800 border-b pb-2"><i class="fa-solid fa-pen-nib text-amber-500 mr-2"></i> Panel de Edición</h2>
             
@@ -153,6 +153,13 @@
                 </div>
                 <button id="btn-add-card" class="w-full bg-amber-500 text-slate-900 py-3 rounded-lg hover:bg-amber-400 transition shadow-md font-bold text-lg"><i class="fa-solid fa-paper-plane mr-2"></i>Guardar Cartilla</button>
             </div>
+
+            <!-- PANEL: LEER SUGERENCIAS -->
+            <div class="p-4 bg-indigo-50 rounded-xl border border-indigo-100 shadow-sm mt-8">
+                <h3 class="font-bold text-sm text-indigo-700 uppercase mb-3"><i class="fa-solid fa-inbox mr-2"></i>Buzón de Sugerencias</h3>
+                <p class="text-xs text-indigo-600 mb-3">Revisa lo que la comunidad te ha escrito.</p>
+                <button id="btn-open-suggestions" class="w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 transition font-semibold shadow-md"><i class="fa-solid fa-eye mr-2"></i>Ver Sugerencias</button>
+            </div>
         </aside>
 
         <main class="flex-1 p-6 md:p-10 bg-slate-100">
@@ -179,7 +186,19 @@
         </div>
     </div>
 
+    <!-- Modal para leer Sugerencias (Solo Admin) -->
+    <div id="modal-suggestions" class="hidden fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50 p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden relative">
+            <button id="btn-close-suggestions" class="absolute top-4 right-4 bg-indigo-200 hover:bg-indigo-300 text-indigo-900 rounded-full w-8 h-8 flex items-center justify-center transition z-10"><i class="fa-solid fa-times"></i></button>
+            <div class="bg-indigo-600 text-white p-6 text-center">
+                <h2 class="text-2xl font-bold font-serif"><i class="fa-solid fa-lightbulb mr-2"></i> Sugerencias de la Comunidad</h2>
+            </div>
+            <div id="suggestions-content" class="p-6 overflow-y-auto bg-slate-50 flex-1 space-y-4">
+                <!-- Las sugerencias se inyectarán aquí -->
+            </div>
+        </div>
+    </div>
+
     <script type="module" src="app.js"></script>
 </body>
 </html>
-                
