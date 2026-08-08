@@ -1,4 +1,4 @@
-// 1. Importaciones actualizadas (Se agregan deleteDoc, updateDoc y getDoc)
+// 1. Importaciones
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, getDocs, doc, setDoc, deleteDoc, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -17,6 +17,7 @@ const firebaseConfig = {
 const CLOUDINARY_CLOUD_NAME = "fr8ult62"; // Ej: "dxyz123ab"
 const CLOUDINARY_UPLOAD_PRESET = "Literatura_preset"; // El nombre que le pusiste en el Paso 2
 const ADMIN_EMAIL = "gregoryplaza4@gmail.com";
+
 // Inicializar
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
@@ -25,6 +26,7 @@ const auth = getAuth(app);
 // Variables globales para el modo Edición
 let idCartillaEditando = null;
 let idAutorEditando = null;
+let imagenActualEditando = null; // <-- Guardará la memoria de la foto anterior
 
 // 4. Inicializar Editor de Texto (Quill)
 const quill = new Quill('#editor', {
@@ -34,7 +36,39 @@ const quill = new Quill('#editor', {
 });
 
 // -----------------------------------------------------------
-// 5. LÓGICA DE LA VENTANA DE AUTENTICACIÓN
+// 5. LÓGICA DE INDICADOR DE IMAGEN
+// -----------------------------------------------------------
+const fileInput = document.getElementById('card-image');
+const uploadPlaceholder = document.getElementById('upload-placeholder');
+const filePreview = document.getElementById('file-preview');
+const fileNameDisplay = document.getElementById('file-name');
+const btnRemoveImage = document.getElementById('btn-remove-image');
+
+fileInput.addEventListener('change', (e) => {
+    if (e.target.files.length > 0) {
+        fileNameDisplay.textContent = e.target.files[0].name;
+        uploadPlaceholder.classList.add('hidden');
+        filePreview.classList.remove('hidden');
+        filePreview.classList.add('flex');
+        btnRemoveImage.classList.remove('hidden');
+    }
+});
+
+btnRemoveImage.addEventListener('click', () => { 
+    resetearCajaImagen(); 
+});
+
+function resetearCajaImagen() {
+    fileInput.value = ''; 
+    imagenActualEditando = null; // Si el usuario la quita, la borramos de la memoria
+    uploadPlaceholder.classList.remove('hidden');
+    filePreview.classList.add('hidden');
+    filePreview.classList.remove('flex');
+    btnRemoveImage.classList.add('hidden');
+}
+
+// -----------------------------------------------------------
+// 6. LÓGICA DE LA VENTANA DE AUTENTICACIÓN
 // -----------------------------------------------------------
 const authModal = document.getElementById('auth-modal');
 const formLogin = document.getElementById('form-login-section');
@@ -92,7 +126,8 @@ const loginGoogle = async () => {
         }, { merge: true }); 
         authModal.classList.add('hidden');
     } catch (error) {
-        alert("El inicio de sesión fue cancelado.");
+        console.error(error);
+        alert("El inicio de sesión fue cancelado o bloqueado.");
     }
 };
 document.getElementById('btn-login-google').addEventListener('click', loginGoogle);
@@ -136,9 +171,8 @@ document.getElementById('btn-recover').addEventListener('click', async () => {
     } catch (error) { alert("Error al enviar el correo."); }
 });
 
-
 // -----------------------------------------------------------
-// 6. DETECCIÓN DE USUARIO
+// 7. DETECCIÓN DE USUARIO
 // -----------------------------------------------------------
 onAuthStateChanged(auth, (user) => {
     const adminPanel = document.getElementById('admin-panel');
@@ -166,9 +200,8 @@ onAuthStateChanged(auth, (user) => {
 
 document.getElementById('btn-logout').addEventListener('click', () => signOut(auth));
 
-
 // -----------------------------------------------------------
-// 7. LÓGICA DE SOBRES Y CARTILLAS (Crear, Editar y Eliminar)
+// 8. LÓGICA DE SOBRES Y CARTILLAS (Crear, Editar y Eliminar)
 // -----------------------------------------------------------
 document.getElementById('btn-add-author').addEventListener('click', async () => {
     const input = document.getElementById('author-name');
@@ -182,20 +215,23 @@ document.getElementById('btn-add-author').addEventListener('click', async () => 
 // Guardar o Actualizar Cartilla
 document.getElementById('btn-add-card').addEventListener('click', async () => {
     const authorId = document.getElementById('select-author').value;
-    const fileInput = document.getElementById('card-image');
     const textHtml = quill.root.innerHTML;
     const plainText = quill.getText().trim();
     const btn = document.getElementById('btn-add-card');
 
     if (!authorId) return alert('Selecciona un autor.');
-    if (plainText === '' && fileInput.files.length === 0) return alert('Agrega texto o imagen.');
+    
+    // Validar: debe tener texto, o una foto nueva, o estar conservando una foto vieja
+    if (plainText === '' && fileInput.files.length === 0 && !imagenActualEditando) {
+        return alert('Agrega texto o imagen.');
+    }
 
     btn.disabled = true;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Procesando...';
 
     try {
         let imageUrl = null;
-        // Si subió una foto nueva, la enviamos a Cloudinary
+        // Si hay una foto NUEVA cargada, la subimos
         if (fileInput.files.length > 0) {
             const formData = new FormData();
             formData.append('file', fileInput.files[0]);
@@ -206,18 +242,22 @@ document.getElementById('btn-add-card').addEventListener('click', async () => {
         }
 
         if (idCartillaEditando) {
-            // MODO EDICIÓN: Actualizar existente
             let datosActualizados = { texto: plainText !== '' ? textHtml : '' };
-            if (imageUrl) datosActualizados.imagen = imageUrl; // Solo actualiza imagen si subió una nueva
+            
+            // Si subió una foto nueva, se guarda esa. Si no, se guarda la memoria (puede ser null si la borró)
+            if (imageUrl) {
+                datosActualizados.imagen = imageUrl; 
+            } else {
+                datosActualizados.imagen = imagenActualEditando;
+            }
             
             await updateDoc(doc(db, `autores/${idAutorEditando}/cartillas/${idCartillaEditando}`), datosActualizados);
             alert('¡Cartilla actualizada con éxito!');
             
-            // Salir del modo edición
             idCartillaEditando = null;
             idAutorEditando = null;
         } else {
-            // MODO CREACIÓN: Guardar nueva
+            // Guardando nueva cartilla normal
             await addDoc(collection(db, `autores/${authorId}/cartillas`), {
                 texto: plainText !== '' ? textHtml : '', 
                 imagen: imageUrl,
@@ -226,21 +266,18 @@ document.getElementById('btn-add-card').addEventListener('click', async () => {
             alert('¡Cartilla guardada!');
         }
 
-        // Limpiar panel
         quill.root.innerHTML = ''; 
-        fileInput.value = ''; 
+        resetearCajaImagen(); 
         btn.innerHTML = '<i class="fa-solid fa-paper-plane mr-2"></i>Guardar Cartilla';
         
     } catch (error) { 
         alert('Error al guardar/actualizar.'); 
         console.error(error);
     } 
-    finally { 
-        btn.disabled = false; 
-    }
+    finally { btn.disabled = false; }
 });
 
-// Cargar Sobres visualmente
+// Cargar Sobres
 onSnapshot(query(collection(db, "autores"), orderBy("fechaCreacion", "asc")), (snapshot) => {
     const selectAuthor = document.getElementById('select-author');
     const grid = document.getElementById('envelopes-grid');
@@ -258,7 +295,7 @@ onSnapshot(query(collection(db, "autores"), orderBy("fechaCreacion", "asc")), (s
     });
 });
 
-// Abrir Sobre y cargar botones de edición/eliminación si eres Admin
+// Abrir Sobre y habilitar Edición
 async function abrirSobre(autorId, autorNombre) {
     const modal = document.getElementById('modal-cards');
     const modalContent = document.getElementById('modal-content');
@@ -266,7 +303,6 @@ async function abrirSobre(autorId, autorNombre) {
     modalContent.innerHTML = '<div class="text-center py-10"><i class="fa-solid fa-spinner fa-spin text-3xl text-amber-500"></i></div>';
     modal.classList.remove('hidden');
 
-    // Comprobar si el usuario actual es el Administrador
     const isAdmin = auth.currentUser && auth.currentUser.email === ADMIN_EMAIL;
 
     try {
@@ -278,10 +314,8 @@ async function abrirSobre(autorId, autorNombre) {
             const cartillaId = docSnap.id;
             const cartilla = docSnap.data();
             
-            // Le quitamos el "group" que causaba el problema en móviles
-            let cardHtml = `<div class="bg-white p-6 rounded-xl shadow-md border border-gray-100 mb-6 relative pt-12">`; 
+            let cardHtml = `<div class="bg-white p-6 rounded-xl shadow-md border border-gray-100 mb-6 relative pt-14">`; 
             
-            // Botones visibles SIEMPRE para el admin (quitamos el opacity-0)
             if(isAdmin) {
                 cardHtml += `
                 <div class="absolute top-3 right-3 flex space-x-2">
@@ -301,56 +335,57 @@ async function abrirSobre(autorId, autorNombre) {
             modalContent.innerHTML += cardHtml;
         });
 
-        // Eventos para Eliminar
         document.querySelectorAll('.btn-eliminar').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 const aId = e.currentTarget.dataset.autor;
                 const cId = e.currentTarget.dataset.cartilla;
                 if(confirm('¿Estás seguro de que deseas eliminar esta cartilla de forma permanente?')) {
                     await deleteDoc(doc(db, `autores/${aId}/cartillas/${cId}`));
-                    abrirSobre(autorId, autorNombre); // Recargar el sobre automáticamente
+                    abrirSobre(autorId, autorNombre); 
                 }
             });
         });
 
-        // Eventos para Editar
         document.querySelectorAll('.btn-editar').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 const aId = e.currentTarget.dataset.autor;
                 const cId = e.currentTarget.dataset.cartilla;
-                
-                // Obtener datos exactos de la BD
                 const cSnap = await getDoc(doc(db, `autores/${aId}/cartillas/${cId}`));
                 const cData = cSnap.data();
                 
-                // Preparar panel de edición
                 idCartillaEditando = cId;
                 idAutorEditando = aId;
+                
+                // Guardar la foto actual en memoria
+                imagenActualEditando = cData.imagen || null;
                 
                 document.getElementById('select-author').value = aId;
                 quill.root.innerHTML = cData.texto || '';
                 
+                // Si la cartilla tenía foto, mostrar el indicador
+                if (imagenActualEditando) {
+                    fileNameDisplay.textContent = "(Foto anterior guardada)";
+                    uploadPlaceholder.classList.add('hidden');
+                    filePreview.classList.remove('hidden');
+                    filePreview.classList.add('flex');
+                    btnRemoveImage.classList.remove('hidden');
+                } else {
+                    resetearCajaImagen();
+                }
+
                 document.getElementById('btn-add-card').innerHTML = '<i class="fa-solid fa-save mr-2"></i>Actualizar Cartilla';
                 
-                // Cerrar modal
                 modal.classList.add('hidden');
-                
-                // Hacer scroll automático hacia arriba para ver el editor
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             });
         });
 
-    } catch (error) { 
-        modalContent.innerHTML = '<p class="text-red-500 text-center py-10">Error al leer las cartillas.</p>'; 
-        console.error(error);
-    }
+    } catch (error) { modalContent.innerHTML = '<p class="text-red-500 text-center py-10">Error al leer las cartillas.</p>'; }
 }
 
-document.getElementById('btn-close-modal').addEventListener('click', () => {
-    document.getElementById('modal-cards').classList.add('hidden');
-});
+document.getElementById('btn-close-modal').addEventListener('click', () => document.getElementById('modal-cards').classList.add('hidden'));
 
-// Enviar Sugerencias
+// 9. Enviar Sugerencias
 document.getElementById('btn-send-suggestion').addEventListener('click', async () => {
     const text = document.getElementById('suggestion-text').value;
     if (!text.trim()) return alert('Por favor escribe algo primero.');
@@ -359,4 +394,4 @@ document.getElementById('btn-send-suggestion').addEventListener('click', async (
         document.getElementById('suggestion-text').value = ''; alert('Sugerencia enviada.');
     } catch (error) { alert('Error al enviar.'); }
 });
-  
+                                                        
