@@ -1,27 +1,27 @@
-// 1. Importaciones de Firebase
+// 1. Importaciones de Firebase (Ya no importamos Storage)
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 // 2. >>> PEGA AQUÍ TU CONFIGURACIÓN DE FIREBASE <<<
 const firebaseConfig = {
-    apiKey: "PEGAR_AQUI",
-    authDomain: "PEGAR_AQUI",
-    projectId: "PEGAR_AQUI",
-    storageBucket: "PEGAR_AQUI",
-    messagingSenderId: "PEGAR_AQUI",
-    appId: "PEGAR_AQUI"
+  apiKey: "AIzaSyC2la2gH1E3alkvYI5_u_rXdQUqX4AY3pc",
+  authDomain: "literatura-e82c6.firebaseapp.com",
+  projectId: "literatura-e82c6",
+  storageBucket: "literatura-e82c6.firebasestorage.app",
+  messagingSenderId: "386815214685",
+  appId: "1:386815214685:web:0e60afe88490730735b9b4"
 };
+
+// 3. >>> CONFIGURACIÓN DE CLOUDINARY Y PERMISOS <<<
+const CLOUDINARY_CLOUD_NAME = "fr8ult62"; // Ej: "dxyz123ab"
+const CLOUDINARY_UPLOAD_PRESET = "Literatura_preset"; // El nombre que le pusiste en el Paso 2
+const ADMIN_EMAIL = "gregoryplaza4@gmail.com"; 
 
 // Inicializar Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const storage = getStorage(app);
 const auth = getAuth(app);
-
-// 3. Cuenta Administradora (La que tiene permisos)
-const ADMIN_EMAIL = "gregoryplaza4@gmail.com"; 
 
 // 4. Inicializar Editor de Texto (Quill)
 const quill = new Quill('#editor', {
@@ -81,7 +81,7 @@ document.getElementById('btn-add-author').addEventListener('click', async () => 
     }
 });
 
-// 7. Guardar Cartilla
+// 7. Guardar Cartilla (Ahora con Cloudinary)
 document.getElementById('btn-add-card').addEventListener('click', async () => {
     const authorId = document.getElementById('select-author').value;
     const fileInput = document.getElementById('card-image');
@@ -97,13 +97,31 @@ document.getElementById('btn-add-card').addEventListener('click', async () => {
 
     try {
         let imageUrl = null;
+        
+        // Subir a Cloudinary si hay imagen
         if (fileInput.files.length > 0) {
             const file = fileInput.files[0];
-            const storageRef = ref(storage, `cartillas/${Date.now()}_${file.name}`);
-            await uploadBytes(storageRef, file);
-            imageUrl = await getDownloadURL(storageRef);
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+
+            const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+            
+            const response = await fetch(cloudinaryUrl, {
+                method: 'POST',
+                body: formData
+            });
+            
+            const data = await response.json();
+            
+            if (data.secure_url) {
+                imageUrl = data.secure_url;
+            } else {
+                throw new Error("Error subiendo la imagen a Cloudinary");
+            }
         }
 
+        // Guardar datos en Firestore usando la URL de Cloudinary
         await addDoc(collection(db, `autores/${authorId}/cartillas`), {
             texto: plainText !== '' ? textHtml : '', 
             imagen: imageUrl,
@@ -115,7 +133,7 @@ document.getElementById('btn-add-card').addEventListener('click', async () => {
         alert('¡Cartilla guardada y agregada al sobre!');
     } catch (error) {
         console.error(error);
-        alert('Error al guardar. Verifica permisos o conexión.');
+        alert('Error al guardar. Verifica tu conexión.');
     } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="fa-solid fa-paper-plane mr-2"></i>Guardar Cartilla';
