@@ -14,14 +14,14 @@ const firebaseConfig = {
 };
 
 // 3. >>> CONFIGURACIÓN DE CLOUDINARY Y PERMISOS <<<
-const CLOUDINARY_CLOUD_NAME = "PEGAR_AQUI"; 
-const CLOUDINARY_UPLOAD_PRESET = "cartillas_preset"; 
-const ADMIN_EMAIL = "gregoryplaza4@gmail.com"; 
-
-// Inicializar
 const CLOUDINARY_CLOUD_NAME = "fr8ult62"; // Ej: "dxyz123ab"
 const CLOUDINARY_UPLOAD_PRESET = "Literatura_preset"; // El nombre que le pusiste en el Paso 2
 const ADMIN_EMAIL = "gregoryplaza4@gmail.com";
+
+// Inicializar
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
 
 // Variables globales de Edición
 let idCartillaEditando = null;
@@ -422,95 +422,4 @@ onSnapshot(query(collection(db, "autores"), orderBy("fechaCreacion", "asc")), (s
 });
 
 // Abrir Sobre y habilitar Edición de Cartillas
-async function abrirSobre(autorId, autorNombre) {
-    const modal = document.getElementById('modal-cards');
-    const modalContent = document.getElementById('modal-content');
-    document.getElementById('modal-author-name').textContent = autorNombre;
-    modalContent.innerHTML = '<div class="text-center py-10"><i class="fa-solid fa-spinner fa-spin text-3xl text-amber-500"></i></div>';
-    modal.classList.remove('hidden');
-
-    const isAdmin = auth.currentUser && auth.currentUser.email === ADMIN_EMAIL;
-
-    try {
-        const querySnapshot = await getDocs(query(collection(db, `autores/${autorId}/cartillas`), orderBy("fecha", "desc")));
-        modalContent.innerHTML = '';
-        if (querySnapshot.empty) { modalContent.innerHTML = '<p class="text-center py-10 text-gray-400">Sobre vacío.</p>'; return; }
-
-        querySnapshot.forEach((docSnap) => {
-            const cartillaId = docSnap.id;
-            const cartilla = docSnap.data();
-            
-            let cardHtml = `<div class="bg-white p-6 rounded-xl shadow-md border border-gray-100 mb-6 relative pt-14">`; 
-            
-            if(isAdmin) {
-                cardHtml += `
-                <div class="absolute top-3 right-3 flex space-x-2">
-                    <button class="btn-editar bg-blue-100 text-blue-600 w-9 h-9 rounded-full active:bg-blue-300 transition flex items-center justify-center shadow" data-autor="${autorId}" data-cartilla="${cartillaId}" title="Editar">
-                        <i class="fa-solid fa-pen text-sm"></i>
-                    </button>
-                    <button class="btn-eliminar bg-red-100 text-red-600 w-9 h-9 rounded-full active:bg-red-300 transition flex items-center justify-center shadow" data-autor="${autorId}" data-cartilla="${cartillaId}" title="Eliminar">
-                        <i class="fa-solid fa-trash text-sm"></i>
-                    </button>
-                </div>`;
-            }
-
-            if (cartilla.imagen) cardHtml += `<img src="${cartilla.imagen}" class="w-full max-h-96 object-contain rounded-lg mb-4 bg-gray-100">`;
-            if (cartilla.texto) cardHtml += `<div class="ql-editor p-0">${cartilla.texto}</div>`;
-            cardHtml += `</div>`;
-            
-            modalContent.innerHTML += cardHtml;
-        });
-
-        document.querySelectorAll('.btn-eliminar').forEach(btn => {
-            btn.addEventListener('click', async (e) => {
-                const aId = e.currentTarget.dataset.autor;
-                const cId = e.currentTarget.dataset.cartilla;
-                if(confirm('¿Estás seguro de que deseas eliminar esta cartilla de forma permanente?')) {
-                    await deleteDoc(doc(db, `autores/${aId}/cartillas/${cId}`));
-                    abrirSobre(autorId, autorNombre); 
-                }
-            });
-        });
-
-        document.querySelectorAll('.btn-editar').forEach(btn => {
-            btn.addEventListener('click', async (e) => {
-                const aId = e.currentTarget.dataset.autor;
-                const cId = e.currentTarget.dataset.cartilla;
-                const cSnap = await getDoc(doc(db, `autores/${aId}/cartillas/${cId}`));
-                const cData = cSnap.data();
-                
-                idCartillaEditando = cId;
-                idAutorEditando = aId;
-                imagenActualEditando = cData.imagen || null;
-                
-                document.getElementById('select-author').value = aId;
-                quill.root.innerHTML = cData.texto || '';
-                
-                if (imagenActualEditando) {
-                    fileNameDisplay.textContent = "📷 Foto actual (Guardada)";
-                    uploadPlaceholder.classList.add('hidden');
-                    filePreview.classList.remove('hidden');
-                    filePreview.classList.add('flex');
-                    btnRemoveImage.classList.remove('hidden');
-                } else {
-                    resetearCajaImagen();
-                }
-
-                document.getElementById('btn-add-card').innerHTML = '<i class="fa-solid fa-save mr-2"></i>Actualizar Cartilla';
-                modal.classList.add('hidden');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            });
-        });
-    } catch (error) { modalContent.innerHTML = '<p class="text-red-500 text-center py-10">Error al leer las cartillas.</p>'; }
-}
-document.getElementById('btn-close-modal').addEventListener('click', () => document.getElementById('modal-cards').classList.add('hidden'));
-
-// 9. Enviar Sugerencias
-document.getElementById('btn-send-suggestion').addEventListener('click', async () => {
-    const text = document.getElementById('suggestion-text').value;
-    if (!text.trim()) return alert('Por favor escribe algo primero.');
-    try {
-        await addDoc(collection(db, "sugerencias"), { texto: text, usuario: auth.currentUser.email, fecha: new Date() });
-        document.getElementById('suggestion-text').value = ''; alert('Sugerencia enviada.');
-    } catch (error) { alert('Error al enviar.'); }
-});
+async function abrirSobre(autorId, autorNombr
