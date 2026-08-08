@@ -14,19 +14,22 @@ const firebaseConfig = {
 };
 
 // 3. >>> CONFIGURACIÓN DE CLOUDINARY Y PERMISOS <<<
+const CLOUDINARY_CLOUD_NAME = "PEGAR_AQUI"; 
+const CLOUDINARY_UPLOAD_PRESET = "cartillas_preset"; 
+const ADMIN_EMAIL = "gregoryplaza4@gmail.com"; 
+
+// Inicializar
 const CLOUDINARY_CLOUD_NAME = "fr8ult62"; // Ej: "dxyz123ab"
 const CLOUDINARY_UPLOAD_PRESET = "Literatura_preset"; // El nombre que le pusiste en el Paso 2
 const ADMIN_EMAIL = "gregoryplaza4@gmail.com";
 
-// Inicializar
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
-
-// Variables globales para el modo Edición
+// Variables globales de Edición
 let idCartillaEditando = null;
 let idAutorEditando = null;
-let imagenActualEditando = null; // <-- Guardará la memoria de la foto anterior
+let imagenActualEditando = null; 
+
+let idAutorPanelEditando = null; // Para editar el autor en sí
+let imagenAutorActualEditando = null;
 
 // 4. Inicializar Editor de Texto (Quill)
 const quill = new Quill('#editor', {
@@ -36,8 +39,10 @@ const quill = new Quill('#editor', {
 });
 
 // -----------------------------------------------------------
-// 5. LÓGICA DE INDICADOR DE IMAGEN
+// 5. LÓGICA DE INDICADORES DE IMÁGENES (Cartilla y Autor)
 // -----------------------------------------------------------
+
+// A) Indicador de Imagen para Cartillas
 const fileInput = document.getElementById('card-image');
 const uploadPlaceholder = document.getElementById('upload-placeholder');
 const filePreview = document.getElementById('file-preview');
@@ -54,17 +59,44 @@ fileInput.addEventListener('change', (e) => {
     }
 });
 
-btnRemoveImage.addEventListener('click', () => { 
-    resetearCajaImagen(); 
-});
+btnRemoveImage.addEventListener('click', () => resetearCajaImagen());
 
 function resetearCajaImagen() {
     fileInput.value = ''; 
-    imagenActualEditando = null; // Si el usuario la quita, la borramos de la memoria
+    imagenActualEditando = null; 
     uploadPlaceholder.classList.remove('hidden');
     filePreview.classList.add('hidden');
     filePreview.classList.remove('flex');
     btnRemoveImage.classList.add('hidden');
+}
+
+// B) Indicador de Imagen para Autores
+const fileInputAutor = document.getElementById('author-image');
+const uploadPlaceholderAutor = document.getElementById('upload-placeholder-author');
+const filePreviewAutor = document.getElementById('file-preview-author');
+const fileNameDisplayAutor = document.getElementById('file-name-author');
+const btnRemoveImageAutor = document.getElementById('btn-remove-image-author');
+const btnCancelAuthor = document.getElementById('btn-cancel-author');
+
+fileInputAutor.addEventListener('change', (e) => {
+    if (e.target.files.length > 0) {
+        fileNameDisplayAutor.textContent = e.target.files[0].name;
+        uploadPlaceholderAutor.classList.add('hidden');
+        filePreviewAutor.classList.remove('hidden');
+        filePreviewAutor.classList.add('flex');
+        btnRemoveImageAutor.classList.remove('hidden');
+    }
+});
+
+btnRemoveImageAutor.addEventListener('click', () => resetearCajaImagenAutor());
+
+function resetearCajaImagenAutor() {
+    fileInputAutor.value = ''; 
+    imagenAutorActualEditando = null; 
+    uploadPlaceholderAutor.classList.remove('hidden');
+    filePreviewAutor.classList.add('hidden');
+    filePreviewAutor.classList.remove('flex');
+    btnRemoveImageAutor.classList.add('hidden');
 }
 
 // -----------------------------------------------------------
@@ -86,17 +118,9 @@ function mostrarFormulario(tipo) {
     formLogin.classList.add('hidden');
     formRegister.classList.add('hidden');
     formRecover.classList.add('hidden');
-    
-    if(tipo === 'login') {
-        formLogin.classList.remove('hidden');
-        authTitle.innerText = "Iniciar Sesión";
-    } else if(tipo === 'register') {
-        formRegister.classList.remove('hidden');
-        authTitle.innerText = "Crear Cuenta";
-    } else if(tipo === 'recover') {
-        formRecover.classList.remove('hidden');
-        authTitle.innerText = "Recuperar Contraseña";
-    }
+    if(tipo === 'login') { formLogin.classList.remove('hidden'); authTitle.innerText = "Iniciar Sesión"; } 
+    else if(tipo === 'register') { formRegister.classList.remove('hidden'); authTitle.innerText = "Crear Cuenta"; } 
+    else if(tipo === 'recover') { formRecover.classList.remove('hidden'); authTitle.innerText = "Recuperar Contraseña"; }
 }
 
 document.getElementById('link-to-register').addEventListener('click', () => mostrarFormulario('register'));
@@ -108,27 +132,16 @@ document.getElementById('btn-login-email').addEventListener('click', async () =>
     const email = document.getElementById('login-email').value;
     const pass = document.getElementById('login-pass').value;
     if(!email || !pass) return alert("Completa ambos campos.");
-    try {
-        await signInWithEmailAndPassword(auth, email, pass);
-        authModal.classList.add('hidden'); 
-    } catch (error) {
-        alert("Error al iniciar sesión. Verifica tu correo y contraseña.");
-    }
+    try { await signInWithEmailAndPassword(auth, email, pass); authModal.classList.add('hidden'); } 
+    catch (error) { alert("Error al iniciar sesión. Verifica tu correo y contraseña."); }
 });
 
 const loginGoogle = async () => {
     try {
         const result = await signInWithPopup(auth, new GoogleAuthProvider());
-        await setDoc(doc(db, "usuarios", result.user.uid), {
-            nombre: result.user.displayName || "Usuario Google",
-            email: result.user.email,
-            metodo: "Google"
-        }, { merge: true }); 
+        await setDoc(doc(db, "usuarios", result.user.uid), { nombre: result.user.displayName, email: result.user.email, metodo: "Google" }, { merge: true }); 
         authModal.classList.add('hidden');
-    } catch (error) {
-        console.error(error);
-        alert("El inicio de sesión fue cancelado o bloqueado.");
-    }
+    } catch (error) { alert("El inicio de sesión fue cancelado o bloqueado."); }
 };
 document.getElementById('btn-login-google').addEventListener('click', loginGoogle);
 document.getElementById('btn-register-google').addEventListener('click', loginGoogle);
@@ -145,30 +158,17 @@ document.getElementById('btn-register-email').addEventListener('click', async ()
 
     try {
         const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
-        const user = userCredential.user;
-        await setDoc(doc(db, "usuarios", user.uid), {
-            nombre: nombre,
-            apellido: apellido,
-            celular: celular,
-            email: email,
-            fechaRegistro: new Date()
-        });
+        await setDoc(doc(db, "usuarios", userCredential.user.uid), { nombre: nombre, apellido: apellido, celular: celular, email: email, fechaRegistro: new Date() });
         alert("¡Cuenta creada con éxito!");
         authModal.classList.add('hidden');
-    } catch (error) {
-        if(error.code === 'auth/email-already-in-use') alert("Este correo ya está registrado.");
-        else alert("Error al registrar: " + error.message);
-    }
+    } catch (error) { alert("Error al registrar: " + error.message); }
 });
 
 document.getElementById('btn-recover').addEventListener('click', async () => {
     const email = document.getElementById('rec-email').value;
     if(!email) return alert("Por favor ingresa tu correo.");
-    try {
-        await sendPasswordResetEmail(auth, email);
-        alert("Si el correo existe, recibirás un enlace para restablecer tu contraseña.");
-        mostrarFormulario('login');
-    } catch (error) { alert("Error al enviar el correo."); }
+    try { await sendPasswordResetEmail(auth, email); alert("Si el correo existe, recibirás un enlace."); mostrarFormulario('login'); } 
+    catch (error) { alert("Error al enviar el correo."); }
 });
 
 // -----------------------------------------------------------
@@ -197,22 +197,78 @@ onAuthStateChanged(auth, (user) => {
         guestSuggestions.classList.add('hidden');
     }
 });
-
 document.getElementById('btn-logout').addEventListener('click', () => signOut(auth));
 
 // -----------------------------------------------------------
-// 8. LÓGICA DE SOBRES Y CARTILLAS (Crear, Editar y Eliminar)
+// 8. LÓGICA DE AUTORES Y CARTILLAS (Crear, Editar y Eliminar)
 // -----------------------------------------------------------
-document.getElementById('btn-add-author').addEventListener('click', async () => {
-    const input = document.getElementById('author-name');
-    if (!input.value.trim()) return alert('Escribe el nombre del autor.');
-    try {
-        await addDoc(collection(db, "autores"), { nombre: input.value.trim(), fechaCreacion: new Date() });
-        input.value = ''; alert('Sobre creado exitosamente.');
-    } catch (error) { alert('Error. Verifica permisos.'); }
+
+// Cancelar edición de autor
+btnCancelAuthor.addEventListener('click', () => {
+    idAutorPanelEditando = null;
+    document.getElementById('titulo-panel-autor').textContent = '1. Crear Nuevo Autor';
+    document.getElementById('author-name').value = '';
+    document.getElementById('btn-add-author').innerHTML = '<i class="fa-solid fa-plus mr-2"></i>Crear Autor';
+    btnCancelAuthor.classList.add('hidden');
+    resetearCajaImagenAutor();
 });
 
-// Guardar o Actualizar Cartilla
+// A) CREAR O ACTUALIZAR AUTOR
+document.getElementById('btn-add-author').addEventListener('click', async () => {
+    const input = document.getElementById('author-name');
+    const btn = document.getElementById('btn-add-author');
+
+    if (!input.value.trim()) return alert('Escribe el nombre del autor.');
+    
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Procesando...';
+
+    try {
+        let imageUrl = null;
+        if (fileInputAutor.files.length > 0) {
+            const formData = new FormData();
+            formData.append('file', fileInputAutor.files[0]);
+            formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+            const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, { method: 'POST', body: formData });
+            const data = await response.json();
+            if (data.secure_url) imageUrl = data.secure_url;
+        }
+
+        if(idAutorPanelEditando) {
+            // MODO EDICIÓN DE AUTOR
+            let datosActualizados = { nombre: input.value.trim() };
+            if (imageUrl) {
+                datosActualizados.imagenAutor = imageUrl;
+            } else {
+                datosActualizados.imagenAutor = imagenAutorActualEditando;
+            }
+            await updateDoc(doc(db, `autores/${idAutorPanelEditando}`), datosActualizados);
+            alert('Autor actualizado correctamente.');
+            idAutorPanelEditando = null;
+            document.getElementById('titulo-panel-autor').textContent = '1. Crear Nuevo Autor';
+            btnCancelAuthor.classList.add('hidden');
+        } else {
+            // MODO CREACIÓN
+            await addDoc(collection(db, "autores"), { 
+                nombre: input.value.trim(), 
+                imagenAutor: imageUrl,
+                fechaCreacion: new Date() 
+            });
+            alert('Autor creado exitosamente.');
+        }
+        
+        input.value = ''; 
+        resetearCajaImagenAutor();
+    } catch (error) { 
+        alert('Error al guardar autor.'); 
+        console.error(error);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-plus mr-2"></i>Crear Autor';
+    }
+});
+
+// B) Guardar o Actualizar Cartilla
 document.getElementById('btn-add-card').addEventListener('click', async () => {
     const authorId = document.getElementById('select-author').value;
     const textHtml = quill.root.innerHTML;
@@ -220,18 +276,13 @@ document.getElementById('btn-add-card').addEventListener('click', async () => {
     const btn = document.getElementById('btn-add-card');
 
     if (!authorId) return alert('Selecciona un autor.');
-    
-    // Validar: debe tener texto, o una foto nueva, o estar conservando una foto vieja
-    if (plainText === '' && fileInput.files.length === 0 && !imagenActualEditando) {
-        return alert('Agrega texto o imagen.');
-    }
+    if (plainText === '' && fileInput.files.length === 0 && !imagenActualEditando) return alert('Debes agregar texto o imagen.');
 
     btn.disabled = true;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Procesando...';
 
     try {
         let imageUrl = null;
-        // Si hay una foto NUEVA cargada, la subimos
         if (fileInput.files.length > 0) {
             const formData = new FormData();
             formData.append('file', fileInput.files[0]);
@@ -243,26 +294,15 @@ document.getElementById('btn-add-card').addEventListener('click', async () => {
 
         if (idCartillaEditando) {
             let datosActualizados = { texto: plainText !== '' ? textHtml : '' };
-            
-            // Si subió una foto nueva, se guarda esa. Si no, se guarda la memoria (puede ser null si la borró)
-            if (imageUrl) {
-                datosActualizados.imagen = imageUrl; 
-            } else {
-                datosActualizados.imagen = imagenActualEditando;
-            }
+            if (imageUrl) { datosActualizados.imagen = imageUrl; } 
+            else { datosActualizados.imagen = imagenActualEditando; }
             
             await updateDoc(doc(db, `autores/${idAutorEditando}/cartillas/${idCartillaEditando}`), datosActualizados);
             alert('¡Cartilla actualizada con éxito!');
-            
             idCartillaEditando = null;
             idAutorEditando = null;
         } else {
-            // Guardando nueva cartilla normal
-            await addDoc(collection(db, `autores/${authorId}/cartillas`), {
-                texto: plainText !== '' ? textHtml : '', 
-                imagen: imageUrl,
-                fecha: new Date()
-            });
+            await addDoc(collection(db, `autores/${authorId}/cartillas`), { texto: plainText !== '' ? textHtml : '', imagen: imageUrl, fecha: new Date() });
             alert('¡Cartilla guardada!');
         }
 
@@ -270,32 +310,118 @@ document.getElementById('btn-add-card').addEventListener('click', async () => {
         resetearCajaImagen(); 
         btn.innerHTML = '<i class="fa-solid fa-paper-plane mr-2"></i>Guardar Cartilla';
         
-    } catch (error) { 
-        alert('Error al guardar/actualizar.'); 
-        console.error(error);
-    } 
+    } catch (error) { alert('Error al guardar/actualizar.'); } 
     finally { btn.disabled = false; }
 });
 
-// Cargar Sobres
+// Cargar Colección Visualmente
 onSnapshot(query(collection(db, "autores"), orderBy("fechaCreacion", "asc")), (snapshot) => {
     const selectAuthor = document.getElementById('select-author');
     const grid = document.getElementById('envelopes-grid');
     selectAuthor.innerHTML = '<option value="">Selecciona un Autor...</option>';
     grid.innerHTML = '';
 
-    snapshot.forEach((doc) => {
-        const autor = doc.data();
-        selectAuthor.innerHTML += `<option value="${doc.id}">${autor.nombre}</option>`;
+    const isAdmin = auth.currentUser && auth.currentUser.email === ADMIN_EMAIL;
+
+    snapshot.forEach((docSnap) => {
+        const autor = docSnap.data();
+        selectAuthor.innerHTML += `<option value="${docSnap.id}">${autor.nombre}</option>`;
+        
         const envelopeDiv = document.createElement('div');
-        envelopeDiv.className = "bg-white p-6 rounded-2xl shadow-sm hover:shadow-xl border-t-4 border-amber-400 transition-all cursor-pointer flex flex-col items-center justify-center h-48 transform hover:-translate-y-1";
-        envelopeDiv.innerHTML = `<i class="fa-regular fa-envelope text-6xl text-slate-300 mb-3 group-hover:text-amber-500 transition-colors"></i><h3 class="text-lg font-bold text-slate-800 text-center font-serif">${autor.nombre}</h3><p class="text-xs text-slate-400 mt-2 uppercase tracking-widest">Abrir Sobre</p>`;
-        envelopeDiv.addEventListener('click', () => abrirSobre(doc.id, autor.nombre));
+        envelopeDiv.className = "bg-white p-6 rounded-2xl shadow-sm hover:shadow-xl border-t-4 border-amber-400 transition-all cursor-pointer flex flex-col items-center justify-center h-48 transform hover:-translate-y-1 relative group";
+        
+        let adminButtons = '';
+        if (isAdmin) {
+            adminButtons = `
+            <div class="absolute top-3 right-3 flex space-x-2 z-10 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                <button class="btn-editar-autor bg-blue-100 text-blue-600 w-8 h-8 rounded-full active:bg-blue-300 hover:bg-blue-200 transition flex items-center justify-center shadow" data-autor="${docSnap.id}" title="Editar Autor">
+                    <i class="fa-solid fa-pen text-xs"></i>
+                </button>
+                <button class="btn-eliminar-autor bg-red-100 text-red-600 w-8 h-8 rounded-full active:bg-red-300 hover:bg-red-200 transition flex items-center justify-center shadow" data-autor="${docSnap.id}" title="Eliminar Autor">
+                    <i class="fa-solid fa-trash text-xs"></i>
+                </button>
+            </div>`;
+        }
+
+        let iconoHtml = autor.imagenAutor
+            ? `<img src="${autor.imagenAutor}" alt="${autor.nombre}" class="w-16 h-16 rounded-full object-cover mb-3 shadow-md border-2 border-amber-200">`
+            : `<i class="fa-regular fa-envelope text-6xl text-slate-300 mb-3 group-hover:text-amber-500 transition-colors"></i>`;
+
+        envelopeDiv.innerHTML = `
+            ${adminButtons}
+            ${iconoHtml}
+            <h3 class="text-lg font-bold text-slate-800 text-center font-serif">${autor.nombre}</h3>
+            <p class="text-xs text-slate-400 mt-2 uppercase tracking-widest">Abrir</p>
+        `;
+        
+        envelopeDiv.addEventListener('click', (e) => {
+            // Si hace clic en el botón de editar o eliminar, no abre el sobre
+            if (e.target.closest('button')) return;
+            abrirSobre(docSnap.id, autor.nombre);
+        });
+        
         grid.appendChild(envelopeDiv);
+    });
+
+    // Lógica para Eliminar Autor
+    document.querySelectorAll('.btn-eliminar-autor').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const aId = e.currentTarget.dataset.autor;
+            if(confirm('¿Seguro que deseas eliminar a este autor y TODAS sus cartillas? Esta acción es permanente.')) {
+                try {
+                    // Primero borramos todas sus cartillas
+                    const cartillasSnap = await getDocs(collection(db, `autores/${aId}/cartillas`));
+                    cartillasSnap.forEach(async (cDoc) => {
+                        await deleteDoc(doc(db, `autores/${aId}/cartillas/${cDoc.id}`));
+                    });
+                    // Luego borramos al autor
+                    await deleteDoc(doc(db, `autores/${aId}`));
+                    alert('Autor y cartillas eliminados.');
+                } catch (error) {
+                    alert('Error al eliminar autor.');
+                }
+            }
+        });
+    });
+
+    // Lógica para Editar Autor
+    document.querySelectorAll('.btn-editar-autor').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const aId = e.currentTarget.dataset.autor;
+            
+            try {
+                const aSnap = await getDoc(doc(db, `autores/${aId}`));
+                const aData = aSnap.data();
+                
+                idAutorPanelEditando = aId;
+                imagenAutorActualEditando = aData.imagenAutor || null;
+                
+                document.getElementById('titulo-panel-autor').textContent = '1. Editando Autor';
+                document.getElementById('author-name').value = aData.nombre;
+                btnCancelAuthor.classList.remove('hidden');
+                
+                if (imagenAutorActualEditando) {
+                    fileNameDisplayAutor.textContent = "📷 Foto actual (Guardada)";
+                    uploadPlaceholderAutor.classList.add('hidden');
+                    filePreviewAutor.classList.remove('hidden');
+                    filePreviewAutor.classList.add('flex');
+                    btnRemoveImageAutor.classList.remove('hidden');
+                } else {
+                    resetearCajaImagenAutor();
+                }
+
+                document.getElementById('btn-add-author').innerHTML = '<i class="fa-solid fa-save mr-2"></i>Actualizar Autor';
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            } catch (error) {
+                alert('Error al preparar la edición del autor.');
+            }
+        });
     });
 });
 
-// Abrir Sobre y habilitar Edición
+// Abrir Sobre y habilitar Edición de Cartillas
 async function abrirSobre(autorId, autorNombre) {
     const modal = document.getElementById('modal-cards');
     const modalContent = document.getElementById('modal-content');
@@ -355,16 +481,13 @@ async function abrirSobre(autorId, autorNombre) {
                 
                 idCartillaEditando = cId;
                 idAutorEditando = aId;
-                
-                // Guardar la foto actual en memoria
                 imagenActualEditando = cData.imagen || null;
                 
                 document.getElementById('select-author').value = aId;
                 quill.root.innerHTML = cData.texto || '';
                 
-                // Si la cartilla tenía foto, mostrar el indicador
                 if (imagenActualEditando) {
-                    fileNameDisplay.textContent = "(Foto anterior guardada)";
+                    fileNameDisplay.textContent = "📷 Foto actual (Guardada)";
                     uploadPlaceholder.classList.add('hidden');
                     filePreview.classList.remove('hidden');
                     filePreview.classList.add('flex');
@@ -374,15 +497,12 @@ async function abrirSobre(autorId, autorNombre) {
                 }
 
                 document.getElementById('btn-add-card').innerHTML = '<i class="fa-solid fa-save mr-2"></i>Actualizar Cartilla';
-                
                 modal.classList.add('hidden');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             });
         });
-
     } catch (error) { modalContent.innerHTML = '<p class="text-red-500 text-center py-10">Error al leer las cartillas.</p>'; }
 }
-
 document.getElementById('btn-close-modal').addEventListener('click', () => document.getElementById('modal-cards').classList.add('hidden'));
 
 // 9. Enviar Sugerencias
@@ -394,4 +514,3 @@ document.getElementById('btn-send-suggestion').addEventListener('click', async (
         document.getElementById('suggestion-text').value = ''; alert('Sugerencia enviada.');
     } catch (error) { alert('Error al enviar.'); }
 });
-                                                        
