@@ -278,16 +278,17 @@ async function abrirSobre(autorId, autorNombre) {
             const cartillaId = docSnap.id;
             const cartilla = docSnap.data();
             
-            let cardHtml = `<div class="bg-white p-6 rounded-xl shadow-md border border-gray-100 mb-6 relative group">`;
+            // Le quitamos el "group" que causaba el problema en móviles
+            let cardHtml = `<div class="bg-white p-6 rounded-xl shadow-md border border-gray-100 mb-6 relative pt-12">`; 
             
-            // Botones solo visibles para el admin
+            // Botones visibles SIEMPRE para el admin (quitamos el opacity-0)
             if(isAdmin) {
                 cardHtml += `
-                <div class="absolute top-3 right-3 flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button class="btn-editar bg-blue-100 text-blue-600 w-8 h-8 rounded-full hover:bg-blue-200 transition flex items-center justify-center shadow" data-autor="${autorId}" data-cartilla="${cartillaId}" title="Editar">
+                <div class="absolute top-3 right-3 flex space-x-2">
+                    <button class="btn-editar bg-blue-100 text-blue-600 w-9 h-9 rounded-full active:bg-blue-300 transition flex items-center justify-center shadow" data-autor="${autorId}" data-cartilla="${cartillaId}" title="Editar">
                         <i class="fa-solid fa-pen text-sm"></i>
                     </button>
-                    <button class="btn-eliminar bg-red-100 text-red-600 w-8 h-8 rounded-full hover:bg-red-200 transition flex items-center justify-center shadow" data-autor="${autorId}" data-cartilla="${cartillaId}" title="Eliminar">
+                    <button class="btn-eliminar bg-red-100 text-red-600 w-9 h-9 rounded-full active:bg-red-300 transition flex items-center justify-center shadow" data-autor="${autorId}" data-cartilla="${cartillaId}" title="Eliminar">
                         <i class="fa-solid fa-trash text-sm"></i>
                     </button>
                 </div>`;
