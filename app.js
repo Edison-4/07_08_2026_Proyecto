@@ -355,7 +355,6 @@ onSnapshot(query(collection(db, "autores"), orderBy("fechaCreacion", "asc")), (s
         `;
         
         envelopeDiv.addEventListener('click', (e) => {
-            // Si hace clic en el botón de editar o eliminar, no abre el sobre
             if (e.target.closest('button')) return;
             abrirSobre(docSnap.id, autor.nombre);
         });
@@ -370,12 +369,10 @@ onSnapshot(query(collection(db, "autores"), orderBy("fechaCreacion", "asc")), (s
             const aId = e.currentTarget.dataset.autor;
             if(confirm('¿Seguro que deseas eliminar a este autor y TODAS sus cartillas? Esta acción es permanente.')) {
                 try {
-                    // Primero borramos todas sus cartillas
                     const cartillasSnap = await getDocs(collection(db, `autores/${aId}/cartillas`));
                     cartillasSnap.forEach(async (cDoc) => {
                         await deleteDoc(doc(db, `autores/${aId}/cartillas/${cDoc.id}`));
                     });
-                    // Luego borramos al autor
                     await deleteDoc(doc(db, `autores/${aId}`));
                     alert('Autor y cartillas eliminados.');
                 } catch (error) {
@@ -422,4 +419,7 @@ onSnapshot(query(collection(db, "autores"), orderBy("fechaCreacion", "asc")), (s
 });
 
 // Abrir Sobre y habilitar Edición de Cartillas
-async function abrirSobre(autorId, autorNombr
+async function abrirSobre(autorId, autorNombre) {
+    const modal = document.getElementById('modal-cards');
+    const modalContent = document.getElementById('modal-content');
+    document.getElementByI
