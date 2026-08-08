@@ -4,52 +4,101 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Letras & Sobres</title>
-    <!-- Tailwind CSS para diseño moderno -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Quill.js para el editor de texto enriquecido -->
     <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
     <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
-    <!-- FontAwesome para iconos -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* Ajustes para el editor de texto */
         .ql-container { font-size: 16px; font-family: inherit; }
         .ql-editor { min-height: 150px; }
     </style>
 </head>
-<body class="bg-gray-100 text-gray-800 font-sans">
+<body class="bg-gray-100 text-gray-800 font-sans relative">
 
     <!-- Navegación Superior -->
     <nav class="bg-slate-800 text-white p-4 shadow-lg flex justify-between items-center sticky top-0 z-10">
         <h1 class="text-2xl font-bold tracking-wide"><i class="fa-solid fa-envelope-open-text text-amber-400 mr-2"></i> Letras & Sobres</h1>
         <div id="auth-section">
-            <button id="btn-login" class="bg-amber-500 text-slate-900 px-5 py-2 rounded-lg font-bold hover:bg-amber-400 transition shadow">Iniciar Sesión</button>
+            <button id="btn-open-auth" class="bg-amber-500 text-slate-900 px-5 py-2 rounded-lg font-bold hover:bg-amber-400 transition shadow">Ingresar</button>
             <button id="btn-logout" class="hidden bg-slate-600 text-white px-5 py-2 rounded-lg font-semibold hover:bg-slate-500 transition shadow">Cerrar Sesión</button>
         </div>
     </nav>
 
+    <!-- VENTANA MODAL DE AUTENTICACIÓN (Inicio, Registro, Recuperación) -->
+    <div id="auth-modal" class="hidden fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50 p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden relative">
+            <button id="btn-close-auth" class="absolute top-4 right-4 text-gray-400 hover:text-gray-800 transition z-10"><i class="fa-solid fa-times text-xl"></i></button>
+            
+            <div class="bg-slate-800 p-6 text-center">
+                <h2 id="auth-title" class="text-2xl font-bold text-white">Iniciar Sesión</h2>
+            </div>
+            
+            <div class="p-6">
+                <!-- FORMULARIO 1: INICIO DE SESIÓN -->
+                <div id="form-login-section">
+                    <input type="email" id="login-email" placeholder="Correo electrónico" class="w-full p-3 border border-gray-300 rounded-lg mb-3 focus:ring-2 focus:ring-amber-400 outline-none">
+                    <input type="password" id="login-pass" placeholder="Contraseña" class="w-full p-3 border border-gray-300 rounded-lg mb-4 focus:ring-2 focus:ring-amber-400 outline-none">
+                    <button id="btn-login-email" class="w-full bg-slate-800 text-white py-3 rounded-lg font-bold hover:bg-slate-700 transition mb-3">Iniciar Sesión</button>
+                    
+                    <div class="flex items-center my-4">
+                        <div class="flex-grow border-t border-gray-300"></div>
+                        <span class="px-3 text-gray-400 text-sm">O también</span>
+                        <div class="flex-grow border-t border-gray-300"></div>
+                    </div>
+                    
+                    <button id="btn-login-google" class="w-full bg-white border border-gray-300 text-gray-700 py-3 rounded-lg font-bold hover:bg-gray-50 transition flex items-center justify-center mb-4">
+                        <img src="https://www.svgrepo.com/show/475656/google-color.svg" class="w-5 h-5 mr-2" alt="Google"> Usar Google
+                    </button>
+                    
+                    <div class="text-center text-sm text-gray-600 mt-4 space-y-2">
+                        <p><a href="#" id="link-to-recover" class="text-amber-600 hover:underline">¿Olvidaste tu contraseña?</a></p>
+                        <p>¿No tienes cuenta? <a href="#" id="link-to-register" class="text-amber-600 font-bold hover:underline">Regístrate aquí</a></p>
+                    </div>
+                </div>
+
+                <!-- FORMULARIO 2: REGISTRO -->
+                <div id="form-register-section" class="hidden">
+                    <div class="grid grid-cols-2 gap-3 mb-3">
+                        <input type="text" id="reg-nombre" placeholder="Nombre" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-400 outline-none">
+                        <input type="text" id="reg-apellido" placeholder="Apellido" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-400 outline-none">
+                    </div>
+                    <input type="tel" id="reg-celular" placeholder="Número de celular" class="w-full p-3 border border-gray-300 rounded-lg mb-3 focus:ring-2 focus:ring-amber-400 outline-none">
+                    <input type="email" id="reg-email" placeholder="Correo electrónico" class="w-full p-3 border border-gray-300 rounded-lg mb-3 focus:ring-2 focus:ring-amber-400 outline-none">
+                    <input type="password" id="reg-pass" placeholder="Crear contraseña (mínimo 6 letras)" class="w-full p-3 border border-gray-300 rounded-lg mb-4 focus:ring-2 focus:ring-amber-400 outline-none">
+                    
+                    <button id="btn-register-email" class="w-full bg-amber-500 text-slate-900 py-3 rounded-lg font-bold hover:bg-amber-400 transition mb-4">Crear Cuenta</button>
+                    <button id="btn-register-google" class="w-full bg-white border border-gray-300 text-gray-700 py-3 rounded-lg font-bold hover:bg-gray-50 transition flex items-center justify-center">
+                        <img src="https://www.svgrepo.com/show/475656/google-color.svg" class="w-5 h-5 mr-2" alt="Google"> Registrarse con Google
+                    </button>
+                    
+                    <p class="text-center text-sm text-gray-600 mt-4">¿Ya tienes cuenta? <a href="#" id="link-back-login" class="text-amber-600 font-bold hover:underline">Inicia Sesión</a></p>
+                </div>
+
+                <!-- FORMULARIO 3: RECUPERAR CONTRASEÑA -->
+                <div id="form-recover-section" class="hidden">
+                    <p class="text-gray-600 text-sm mb-4 text-center">Ingresa tu correo y te enviaremos un enlace para restablecer tu contraseña.</p>
+                    <input type="email" id="rec-email" placeholder="Tu correo electrónico" class="w-full p-3 border border-gray-300 rounded-lg mb-4 focus:ring-2 focus:ring-amber-400 outline-none">
+                    <button id="btn-recover" class="w-full bg-slate-800 text-white py-3 rounded-lg font-bold hover:bg-slate-700 transition">Enviar Enlace</button>
+                    <p class="text-center text-sm text-gray-600 mt-4"><a href="#" id="link-back-login2" class="text-amber-600 font-bold hover:underline">Volver a Iniciar Sesión</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- EL RESTO DE LA PÁGINA (Panel y Vista Principal) SE MANTIENE IGUAL -->
     <div class="flex flex-col md:flex-row min-h-[calc(100vh-72px)]">
-        
-        <!-- PANEL DE ADMINISTRADOR (Visible solo para gregoryplaza4@gmail.com) -->
         <aside id="admin-panel" class="hidden w-full md:w-1/3 lg:w-1/4 bg-white shadow-xl p-6 border-r border-gray-200 overflow-y-auto">
             <h2 class="text-xl font-bold mb-6 text-slate-800 border-b pb-2"><i class="fa-solid fa-pen-nib text-amber-500 mr-2"></i> Panel de Edición</h2>
-            
-            <!-- Crear Nuevo Sobre (Autor) -->
             <div class="mb-8 p-4 bg-slate-50 rounded-xl border border-slate-200 shadow-sm">
                 <h3 class="font-bold text-sm text-slate-500 uppercase mb-3">1. Crear Nuevo Autor</h3>
                 <input type="text" id="author-name" placeholder="Ej. Mario Benedetti" class="w-full p-2 border border-gray-300 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-amber-400">
                 <button id="btn-add-author" class="w-full bg-slate-800 text-white py-2 rounded-lg hover:bg-slate-700 transition font-semibold"><i class="fa-solid fa-plus mr-2"></i>Crear Sobre</button>
             </div>
-
-            <!-- Agregar Cartilla -->
             <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 shadow-sm">
                 <h3 class="font-bold text-sm text-slate-500 uppercase mb-3">2. Agregar Cartilla</h3>
-                
                 <select id="select-author" class="w-full p-2 border border-gray-300 rounded-lg mb-4 bg-white">
                     <option value="">Selecciona un Autor...</option>
                 </select>
-                
-                <!-- Subida de imagen -->
                 <label class="block mb-1 text-sm font-semibold text-gray-700">Fotografía (Opcional)</label>
                 <div class="flex items-center justify-center w-full mb-4">
                     <label class="flex flex-col items-center justify-center w-full h-28 border-2 border-amber-300 border-dashed rounded-lg cursor-pointer bg-white hover:bg-amber-50 transition">
@@ -60,27 +109,17 @@
                         <input id="card-image" type="file" class="hidden" accept="image/*" />
                     </label>
                 </div>
-
-                <!-- Editor de texto enriquecido -->
                 <label class="block mb-1 text-sm font-semibold text-gray-700">Texto de la Cartilla</label>
                 <div class="bg-white rounded-lg mb-4 border border-gray-300">
                     <div id="editor" class="rounded-b-lg"></div>
                 </div>
-
                 <button id="btn-add-card" class="w-full bg-amber-500 text-slate-900 py-3 rounded-lg hover:bg-amber-400 transition shadow-md font-bold text-lg"><i class="fa-solid fa-paper-plane mr-2"></i>Guardar Cartilla</button>
             </div>
         </aside>
 
-        <!-- VISTA PRINCIPAL (Para todos) -->
         <main class="flex-1 p-6 md:p-10 bg-slate-100">
             <h2 class="text-3xl font-bold mb-8 text-slate-800 border-l-4 border-amber-500 pl-4">Colección de Autores</h2>
-            
-            <!-- Grid de Sobres -->
-            <div id="envelopes-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                <!-- Se inyectan con JS -->
-            </div>
-
-            <!-- Buzón de Sugerencias (Para Invitados) -->
+            <div id="envelopes-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></div>
             <div id="guest-suggestions" class="hidden mt-16 max-w-2xl mx-auto p-6 bg-white shadow-lg rounded-2xl border border-gray-200">
                 <h3 class="text-xl font-bold mb-2 text-slate-800"><i class="fa-solid fa-lightbulb text-amber-500 mr-2"></i> Buzón de Sugerencias</h3>
                 <p class="text-gray-600 mb-4 text-sm">¿Te gustaría ver a algún autor en particular o sugerir una frase? Escríbelo aquí.</p>
@@ -90,24 +129,18 @@
         </main>
     </div>
 
-    <!-- VENTANA EMERGENTE (Modal para leer cartillas) -->
+    <!-- Modal para leer cartillas -->
     <div id="modal-cards" class="hidden fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden relative">
-            <button id="btn-close-modal" class="absolute top-4 right-4 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-full w-8 h-8 flex items-center justify-center transition z-10">
-                <i class="fa-solid fa-times"></i>
-            </button>
-            
+            <button id="btn-close-modal" class="absolute top-4 right-4 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-full w-8 h-8 flex items-center justify-center transition z-10"><i class="fa-solid fa-times"></i></button>
             <div class="bg-slate-800 text-white p-6 text-center">
                 <h2 id="modal-author-name" class="text-3xl font-bold font-serif">Nombre del Autor</h2>
             </div>
-            
-            <div id="modal-content" class="p-6 overflow-y-auto bg-slate-50 flex-1 space-y-6">
-                <!-- Las cartillas se inyectan aquí -->
-            </div>
+            <div id="modal-content" class="p-6 overflow-y-auto bg-slate-50 flex-1 space-y-6"></div>
         </div>
     </div>
 
-    <!-- Script de lógica -->
     <script type="module" src="app.js"></script>
 </body>
-</html>
+    </html>
+    
