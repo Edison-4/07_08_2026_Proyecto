@@ -16,7 +16,7 @@ const firebaseConfig = {
 // 3. >>> CONFIGURACIÓN DE CLOUDINARY Y PERMISOS <<<
 const CLOUDINARY_CLOUD_NAME = "fr8ult62"; // Ej: "dxyz123ab"
 const CLOUDINARY_UPLOAD_PRESET = "Literatura_preset"; // El nombre que le pusiste en el Paso 2
-const ADMIN_EMAIL = "gregoryplaza4@gmail.com";
+const ADMIN_EMAIL = "gregoryplaza4@gmail.com"; 
 
 // Inicializar
 const app = initializeApp(firebaseConfig);
@@ -31,9 +31,8 @@ let imagenActualEditando = null;
 let idAutorPanelEditando = null; 
 let imagenAutorActualEditando = null;
 
-// NUEVO: Variables para limpiar el Drag & Drop y evitar bloqueos
-let sortableAutores = null;
-let sortableCartillas = null;
+// NUEVO: Letrero de "No molestar" para evitar que Firebase colapse el Drag&Drop
+let isReorderingAutores = false;
 
 // 4. Inicializar Editor de Texto (Quill)
 const quill = new Quill('#editor', {
@@ -43,7 +42,7 @@ const quill = new Quill('#editor', {
 });
 
 // -----------------------------------------------------------
-// 5. LÓGICA DE INDICADORES DE IMÁGENES
+// 5. LÓGICA DE INDICADORES DE IMÁGENES (Cartilla y Autor)
 // -----------------------------------------------------------
 
 const fileInput = document.getElementById('card-image');
@@ -137,7 +136,7 @@ document.getElementById('btn-login-email').addEventListener('click', async () =>
     try { 
         await signInWithEmailAndPassword(auth, email, pass); 
         authModal.classList.add('hidden'); 
-        window.location.reload();
+        window.location.reload(); 
     } 
     catch (error) { alert("Error al iniciar sesión. Verifica tu correo y contraseña."); }
 });
@@ -147,7 +146,7 @@ const loginGoogle = async () => {
         const result = await signInWithPopup(auth, new GoogleAuthProvider());
         await setDoc(doc(db, "usuarios", result.user.uid), { nombre: result.user.displayName, email: result.user.email, metodo: "Google" }, { merge: true }); 
         authModal.classList.add('hidden');
-        window.location.reload();
+        window.location.reload(); 
     } catch (error) { alert("El inicio de sesión fue cancelado o bloqueado."); }
 };
 document.getElementById('btn-login-google').addEventListener('click', loginGoogle);
@@ -155,6 +154,8 @@ document.getElementById('btn-register-google').addEventListener('click', loginGo
 
 document.getElementById('btn-register-email').addEventListener('click', async () => {
     const nombre = document.getElementById('reg-nombre').value;
+    const apellido = document.getElementById('reg-apellido').value;
+    const celular = document.getElementById('reg-celular').value;
     const email = document.getElementById('reg-email').value;
     const pass = document.getElementById('reg-pass').value;
 
@@ -163,7 +164,7 @@ document.getElementById('btn-register-email').addEventListener('click', async ()
 
     try {
         const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
-        await setDoc(doc(db, "usuarios", userCredential.user.uid), { nombre: nombre, email: email, fechaRegistro: new Date() });
+        await setDoc(doc(db, "usuarios", userCredential.user.uid), { nombre: nombre, apellido: apellido, celular: celular, email: email, fechaRegistro: new Date() });
         alert("¡Cuenta creada con éxito!");
         authModal.classList.add('hidden');
     } catch (error) { alert("Error al registrar: " + error.message); }
@@ -202,10 +203,9 @@ onAuthStateChanged(auth, (user) => {
         guestSuggestions.classList.add('hidden');
     }
 });
-
 document.getElementById('btn-logout').addEventListener('click', async () => {
     await signOut(auth);
-    window.location.reload();
+    window.location.reload(); 
 });
 
 // -----------------------------------------------------------
@@ -308,6 +308,9 @@ document.getElementById('btn-add-card').addEventListener('click', async () => {
 
 // CARGAR AUTORES Y HABILITAR DRAG & DROP
 onSnapshot(collection(db, "autores"), (snapshot) => {
+    // MAGIA APLICADA: Si estás arrastrando una tarjeta, Firebase no borrará nada
+    if (isReorderingAutores) return; 
+
     const selectAuthor = document.getElementById('select-author');
     const grid = document.getElementById('envelopes-grid');
     selectAuthor.innerHTML = '<option value="">Selecciona un Autor...</option>';
@@ -329,6 +332,7 @@ onSnapshot(collection(db, "autores"), (snapshot) => {
         
         const envelopeDiv = document.createElement('div');
         envelopeDiv.className = "bg-white p-6 rounded-2xl shadow-sm hover:shadow-xl border-t-4 border-amber-400 transition-all cursor-pointer flex flex-col items-center justify-center h-48 transform hover:-translate-y-1 relative group";
+        
         envelopeDiv.setAttribute('data-id', autor.id); 
         
         let adminButtons = '';
@@ -366,15 +370,15 @@ onSnapshot(collection(db, "autores"), (snapshot) => {
         grid.appendChild(envelopeDiv);
     });
 
-    // REINICIO DE SORTABLEJS PARA EVITAR EL BLOQUEO
     if (isAdmin && typeof Sortable !== 'undefined') {
-        if (sortableAutores) {
-            sortableAutores.destroy(); // Apaga la versión vieja "fantasma"
-        }
-        sortableAutores = new Sortable(grid, {
+        new Sortable(grid, {
             animation: 150,
             handle: '.drag-handle-autor', 
             ghostClass: 'sortable-ghost',
+            onStart: function (evt) {
+                // Encendemos el candado para que Firebase no borre la pantalla
+                isReorderingAutores = true; 
+            },
             onEnd: async function (evt) {
                 const authorElements = grid.querySelectorAll('div[data-id]');
                 const batch = writeBatch(db); 
@@ -389,6 +393,9 @@ onSnapshot(collection(db, "autores"), (snapshot) => {
                     await batch.commit(); 
                 } catch (error) {
                     alert("Error al guardar el nuevo orden de los autores.");
+                } finally {
+                    // Apagamos el candado después de 1 segundo
+                    setTimeout(() => { isReorderingAutores = false; }, 1000); 
                 }
             }
         });
@@ -496,10 +503,7 @@ async function abrirSobre(autorId, autorNombre) {
         });
 
         if (isAdmin && typeof Sortable !== 'undefined') {
-            if (sortableCartillas) {
-                sortableCartillas.destroy(); // Apaga la versión vieja "fantasma"
-            }
-            sortableCartillas = new Sortable(modalContent, {
+            new Sortable(modalContent, {
                 animation: 150,
                 handle: '.drag-handle', 
                 ghostClass: 'sortable-ghost',
