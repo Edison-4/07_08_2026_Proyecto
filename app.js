@@ -31,10 +31,12 @@ let imagenActualEditando = null;
 let idAutorPanelEditando = null; 
 let imagenAutorActualEditando = null;
 
-// Variables para limpiar el Drag & Drop y evitar bloqueos Zombi
 let sortableAutores = null;
 let sortableCartillas = null;
-let isReorderingAutores = false; // El candado
+let isReorderingAutores = false; 
+
+// NUEVO: Array para guardar a todos los autores y poder filtrarlos
+let autoresMemoria = []; 
 
 // 4. Inicializar Editor de Texto (Quill)
 const quill = new Quill('#editor', {
@@ -215,6 +217,28 @@ document.getElementById('btn-logout').addEventListener('click', async () => {
 // 8. LÓGICA DE AUTORES Y CARTILLAS
 // -----------------------------------------------------------
 
+// NUEVO: Función para dibujar y filtrar la cajita desplegable
+function renderizarSelectAutores(filtro = '') {
+    const selectAuthor = document.getElementById('select-author');
+    const valorActual = selectAuthor.value; 
+    
+    selectAuthor.innerHTML = '<option value="">Selecciona un Autor...</option>';
+    
+    const filtrados = autoresMemoria.filter(autor => autor.nombre.toLowerCase().includes(filtro.toLowerCase()));
+    
+    filtrados.forEach(autor => {
+        selectAuthor.innerHTML += `<option value="${autor.id}">${autor.nombre}</option>`;
+    });
+    
+    if (valorActual) selectAuthor.value = valorActual;
+}
+
+// NUEVO: Escuchador para la barra de búsqueda del autor
+document.getElementById('search-author-select').addEventListener('input', (e) => {
+    renderizarSelectAutores(e.target.value);
+});
+
+
 btnCancelAuthor.addEventListener('click', () => {
     idAutorPanelEditando = null;
     document.getElementById('titulo-panel-autor').textContent = '1. Crear Nuevo Autor';
@@ -309,14 +333,11 @@ document.getElementById('btn-add-card').addEventListener('click', async () => {
     finally { btn.disabled = false; }
 });
 
-// CARGAR AUTORES Y HABILITAR DRAG & DROP
+
 onSnapshot(collection(db, "autores"), (snapshot) => {
-    // Si el candado está encendido, ignoramos el redibujado de Firebase temporalmente
     if (isReorderingAutores) return; 
 
-    const selectAuthor = document.getElementById('select-author');
     const grid = document.getElementById('envelopes-grid');
-    selectAuthor.innerHTML = '<option value="">Selecciona un Autor...</option>';
     grid.innerHTML = '';
 
     const isAdmin = auth.currentUser && auth.currentUser.email === ADMIN_EMAIL;
@@ -330,9 +351,11 @@ onSnapshot(collection(db, "autores"), (snapshot) => {
         return ordenA - ordenB;
     });
 
+    // NUEVO: Cargar los autores en la memoria global y dibujar el selector
+    autoresMemoria = autores;
+    renderizarSelectAutores(document.getElementById('search-author-select').value);
+
     autores.forEach((autor) => {
-        selectAuthor.innerHTML += `<option value="${autor.id}">${autor.nombre}</option>`;
-        
         const envelopeDiv = document.createElement('div');
         envelopeDiv.className = "bg-white p-6 rounded-2xl shadow-sm hover:shadow-xl border-t-4 border-amber-400 transition-all cursor-pointer flex flex-col items-center justify-center h-48 transform hover:-translate-y-1 relative group";
         
@@ -373,22 +396,20 @@ onSnapshot(collection(db, "autores"), (snapshot) => {
         grid.appendChild(envelopeDiv);
     });
 
-    // INICIAR SORTABLEJS
     if (isAdmin && typeof Sortable !== 'undefined') {
         if (sortableAutores) {
-            sortableAutores.destroy(); // Limpia la memoria del zombi
+            sortableAutores.destroy(); 
         }
         sortableAutores = new Sortable(grid, {
             animation: 150,
             handle: '.drag-handle-autor', 
             ghostClass: 'sortable-ghost',
             onStart: function (evt) {
-                isReorderingAutores = true; // Cierra el candado al empezar a mover
+                isReorderingAutores = true; 
             },
             onEnd: function (evt) {
-                // El truco: Esperamos un instante a que termine la animación, abrimos el candado, y LUEGO actualizamos Firebase
                 setTimeout(async () => {
-                    isReorderingAutores = false; // Abre el candado
+                    isReorderingAutores = false; 
                     
                     const authorElements = grid.querySelectorAll('div[data-id]');
                     const batch = writeBatch(db); 
@@ -400,7 +421,7 @@ onSnapshot(collection(db, "autores"), (snapshot) => {
                     });
 
                     try {
-                        await batch.commit(); // Firebase actualiza todo de golpe, y como el candado está abierto, redibuja limpio.
+                        await batch.commit(); 
                     } catch (error) {
                         alert("Error al guardar el nuevo orden de los autores.");
                     }
@@ -448,6 +469,12 @@ onSnapshot(collection(db, "autores"), (snapshot) => {
                 } else { resetearCajaImagenAutor(); }
 
                 document.getElementById('btn-add-author').innerHTML = '<i class="fa-solid fa-save mr-2"></i>Actualizar Autor';
+                
+                // Mantenemos el filtro activo
+                document.getElementById('search-author-select').value = aData.nombre;
+                renderizarSelectAutores(aData.nombre);
+                document.getElementById('select-author').value = aId;
+
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             } catch (error) { alert('Error al preparar la edición del autor.'); }
         });
@@ -559,7 +586,10 @@ async function abrirSobre(autorId, autorNombre) {
                 idAutorEditando = aId;
                 imagenActualEditando = cData.imagen || null;
                 
+                document.getElementById('search-author-select').value = autorNombre;
+                renderizarSelectAutores(autorNombre);
                 document.getElementById('select-author').value = aId;
+
                 quill.root.innerHTML = cData.texto || '';
                 
                 if (imagenActualEditando) {
