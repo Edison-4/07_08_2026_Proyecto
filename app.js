@@ -1,6 +1,6 @@
-// 1. Importaciones
+// 1. Importaciones (Añadido writeBatch para actualizar todo de golpe)
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, getDocs, doc, setDoc, deleteDoc, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, getDocs, doc, setDoc, deleteDoc, updateDoc, getDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 // 2. >>> PEGA AQUÍ TU CONFIGURACIÓN DE FIREBASE <<<
@@ -394,28 +394,46 @@ onSnapshot(query(collection(db, "autores"), orderBy("fechaCreacion", "asc")), (s
     });
 });
 
-// Abrir Sobre y habilitar Edición de Cartillas
+// LÓGICA DE ORDENAMIENTO (DRAG & DROP) AL ABRIR UN SOBRE
 async function abrirSobre(autorId, autorNombre) {
     const modal = document.getElementById('modal-cards');
     const modalContent = document.getElementById('modal-content');
+    const modalInstructions = document.getElementById('modal-instructions');
     document.getElementById('modal-author-name').textContent = autorNombre;
     modalContent.innerHTML = '<div class="text-center py-10"><i class="fa-solid fa-spinner fa-spin text-3xl text-amber-500"></i></div>';
     modal.classList.remove('hidden');
 
     const isAdmin = auth.currentUser && auth.currentUser.email === ADMIN_EMAIL;
+    
+    // Muestra las instrucciones de mantener presionado si es Admin
+    if(isAdmin) { modalInstructions.classList.remove('hidden'); } 
+    else { modalInstructions.classList.add('hidden'); }
 
     try {
-        const querySnapshot = await getDocs(query(collection(db, `autores/${autorId}/cartillas`), orderBy("fecha", "desc")));
+        const querySnapshot = await getDocs(collection(db, `autores/${autorId}/cartillas`));
         modalContent.innerHTML = '';
         if (querySnapshot.empty) { modalContent.innerHTML = '<p class="text-center py-10 text-gray-400">Sobre vacío.</p>'; return; }
 
-        querySnapshot.forEach((docSnap) => {
-            const cartillaId = docSnap.id;
-            const cartilla = docSnap.data();
+        let cartillas = [];
+        querySnapshot.forEach(docSnap => cartillas.push({ id: docSnap.id, ...docSnap.data() }));
+
+        // Ordenamiento inteligente: Protege las cartillas viejas (fecha) y usa el nuevo sistema (orden)
+        cartillas.sort((a, b) => {
+            const ordenA = a.orden !== undefined ? a.orden : (a.fecha ? -a.fecha.toMillis() : 0);
+            const ordenB = b.orden !== undefined ? b.orden : (b.fecha ? -b.fecha.toMillis() : 0);
+            return ordenA - ordenB;
+        });
+
+        cartillas.forEach((cartilla) => {
+            const cartillaId = cartilla.id;
+            // Se le agrega "cursor-grab" y el atributo "data-id" para el sistema Drag & Drop
+            let cardHtml = `<div class="bg-white p-6 rounded-xl shadow-md border border-gray-100 mb-6 relative pt-14 ${isAdmin ? 'cursor-grab active:cursor-grabbing' : ''}" data-id="${cartillaId}">`; 
             
-            let cardHtml = `<div class="bg-white p-6 rounded-xl shadow-md border border-gray-100 mb-6 relative pt-14">`; 
             if(isAdmin) {
                 cardHtml += `
+                <div class="absolute top-3 left-3 text-gray-300">
+                    <i class="fa-solid fa-grip-lines text-xl"></i>
+                </div>
                 <div class="absolute top-3 right-3 flex space-x-2">
                     <button class="btn-editar bg-blue-100 text-blue-600 w-9 h-9 rounded-full active:bg-blue-300 transition flex items-center justify-center shadow" data-autor="${autorId}" data-cartilla="${cartillaId}" title="Editar">
                         <i class="fa-solid fa-pen text-sm"></i>
@@ -425,12 +443,38 @@ async function abrirSobre(autorId, autorNombre) {
                     </button>
                 </div>`;
             }
-            if (cartilla.imagen) cardHtml += `<img src="${cartilla.imagen}" class="w-full max-h-96 object-contain rounded-lg mb-4 bg-gray-100">`;
+            if (cartilla.imagen) cardHtml += `<img src="${cartilla.imagen}" class="w-full max-h-96 object-contain rounded-lg mb-4 bg-gray-100 pointer-events-none">`;
             if (cartilla.texto) cardHtml += `<div class="ql-editor p-0">${cartilla.texto}</div>`;
             cardHtml += `</div>`;
             
             modalContent.innerHTML += cardHtml;
         });
+
+        // INICIAR SORTABLEJS (Solo si es Admin)
+        if (isAdmin && typeof Sortable !== 'undefined') {
+            new Sortable(modalContent, {
+                animation: 150,
+                delay: 200, // IMPORTANTE: Obliga a mantener presionado 200ms en el celular antes de mover
+                delayOnTouchOnly: true,
+                ghostClass: 'sortable-ghost',
+                onEnd: async function (evt) {
+                    const cardElements = modalContent.querySelectorAll('div[data-id]');
+                    const batch = writeBatch(db); // Preparamos la actualización masiva
+                    
+                    cardElements.forEach((el, index) => {
+                        const cId = el.getAttribute('data-id');
+                        const docRef = doc(db, `autores/${autorId}/cartillas/${cId}`);
+                        batch.update(docRef, { orden: index });
+                    });
+
+                    try {
+                        await batch.commit(); // Disparamos todas las actualizaciones a Firebase juntas
+                    } catch (error) {
+                        alert("Error al guardar el nuevo orden.");
+                    }
+                }
+            });
+        }
 
         document.querySelectorAll('.btn-eliminar').forEach(btn => {
             btn.addEventListener('click', async (e) => {
@@ -484,7 +528,6 @@ document.getElementById('btn-send-suggestion').addEventListener('click', async (
     } catch (error) { alert('Error al enviar la sugerencia.'); }
 });
 
-// NUEVO: Botón para abrir el panel de Sugerencias y funcionalidad de ELIMINAR
 document.getElementById('btn-open-suggestions').addEventListener('click', async () => {
     const modalSug = document.getElementById('modal-suggestions');
     const contentSug = document.getElementById('suggestions-content');
@@ -505,29 +548,24 @@ document.getElementById('btn-open-suggestions').addEventListener('click', async 
             
             contentSug.innerHTML += `
                 <div class="bg-white p-5 rounded-xl shadow border border-gray-100 text-left relative">
-                    
                     <button class="btn-eliminar-sugerencia absolute top-4 right-4 bg-red-100 text-red-600 w-8 h-8 rounded-full active:bg-red-300 hover:bg-red-200 transition flex items-center justify-center shadow" data-id="${docSnap.id}" title="Eliminar Sugerencia">
                         <i class="fa-solid fa-trash text-xs"></i>
                     </button>
-                    
                     <div class="flex justify-between items-start mb-3 border-b border-gray-100 pb-2 pr-10">
                         <span class="text-sm font-bold text-slate-700 truncate"><i class="fa-solid fa-user text-indigo-400 mr-2"></i>${sug.usuario || 'Anónimo'}</span>
                         <span class="text-xs text-gray-400 whitespace-nowrap ml-2"><i class="fa-regular fa-clock mr-1"></i>${fechaString}</span>
                     </div>
-                    
                     <p class="text-gray-700 text-sm whitespace-pre-wrap leading-relaxed">${sug.texto}</p>
                 </div>
             `;
         });
 
-        // Eventos para el nuevo botón de eliminar sugerencias
         document.querySelectorAll('.btn-eliminar-sugerencia').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 const sId = e.currentTarget.dataset.id;
                 if(confirm('¿Estás seguro de que deseas eliminar esta sugerencia?')) {
                     try {
                         await deleteDoc(doc(db, `sugerencias/${sId}`));
-                        // Simula un clic en el botón de abrir para recargar el panel mágicamente
                         document.getElementById('btn-open-suggestions').click(); 
                     } catch (error) {
                         alert('Error al eliminar la sugerencia.');
@@ -537,12 +575,10 @@ document.getElementById('btn-open-suggestions').addEventListener('click', async 
         });
 
     } catch (error) {
-        contentSug.innerHTML = '<p class="text-red-500 text-center py-10">Error al leer las sugerencias de la base de datos.</p>';
-        console.error(error);
+        contentSug.innerHTML = '<p class="text-red-500 text-center py-10">Error al leer las sugerencias.</p>';
     }
 });
 
-// Cerrar panel de sugerencias
 document.getElementById('btn-close-suggestions').addEventListener('click', () => {
     document.getElementById('modal-suggestions').classList.add('hidden');
 });
