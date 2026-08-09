@@ -1,4 +1,4 @@
-// 1. Importaciones (Añadido writeBatch para actualizar todo de golpe)
+// 1. Importaciones 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, getDocs, doc, setDoc, deleteDoc, updateDoc, getDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -16,7 +16,7 @@ const firebaseConfig = {
 // 3. >>> CONFIGURACIÓN DE CLOUDINARY Y PERMISOS <<<
 const CLOUDINARY_CLOUD_NAME = "fr8ult62"; // Ej: "dxyz123ab"
 const CLOUDINARY_UPLOAD_PRESET = "Literatura_preset"; // El nombre que le pusiste en el Paso 2
-const ADMIN_EMAIL = "gregoryplaza4@gmail.com";
+const ADMIN_EMAIL = "gregoryplaza4@gmail.com"; 
 
 // Inicializar
 const app = initializeApp(firebaseConfig);
@@ -42,7 +42,6 @@ const quill = new Quill('#editor', {
 // 5. LÓGICA DE INDICADORES DE IMÁGENES (Cartilla y Autor)
 // -----------------------------------------------------------
 
-// A) Indicador de Imagen para Cartillas
 const fileInput = document.getElementById('card-image');
 const uploadPlaceholder = document.getElementById('upload-placeholder');
 const filePreview = document.getElementById('file-preview');
@@ -70,7 +69,6 @@ function resetearCajaImagen() {
     btnRemoveImage.classList.add('hidden');
 }
 
-// B) Indicador de Imagen para Autores
 const fileInputAutor = document.getElementById('author-image');
 const uploadPlaceholderAutor = document.getElementById('upload-placeholder-author');
 const filePreviewAutor = document.getElementById('file-preview-author');
@@ -203,7 +201,6 @@ document.getElementById('btn-logout').addEventListener('click', () => signOut(au
 // 8. LÓGICA DE AUTORES Y CARTILLAS (Crear, Editar y Eliminar)
 // -----------------------------------------------------------
 
-// Cancelar edición de autor
 btnCancelAuthor.addEventListener('click', () => {
     idAutorPanelEditando = null;
     document.getElementById('titulo-panel-autor').textContent = '1. Crear Nuevo Autor';
@@ -213,13 +210,11 @@ btnCancelAuthor.addEventListener('click', () => {
     resetearCajaImagenAutor();
 });
 
-// A) CREAR O ACTUALIZAR AUTOR
 document.getElementById('btn-add-author').addEventListener('click', async () => {
     const input = document.getElementById('author-name');
     const btn = document.getElementById('btn-add-author');
 
     if (!input.value.trim()) return alert('Escribe el nombre del autor.');
-    
     btn.disabled = true;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Procesando...';
 
@@ -255,7 +250,6 @@ document.getElementById('btn-add-author').addEventListener('click', async () => 
     finally { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-plus mr-2"></i>Crear Autor'; }
 });
 
-// B) Guardar o Actualizar Cartilla
 document.getElementById('btn-add-card').addEventListener('click', async () => {
     const authorId = document.getElementById('select-author').value;
     const textHtml = quill.root.innerHTML;
@@ -301,7 +295,6 @@ document.getElementById('btn-add-card').addEventListener('click', async () => {
     finally { btn.disabled = false; }
 });
 
-// Cargar Colección Visualmente
 onSnapshot(query(collection(db, "autores"), orderBy("fechaCreacion", "asc")), (snapshot) => {
     const selectAuthor = document.getElementById('select-author');
     const grid = document.getElementById('envelopes-grid');
@@ -394,20 +387,24 @@ onSnapshot(query(collection(db, "autores"), orderBy("fechaCreacion", "asc")), (s
     });
 });
 
-// LÓGICA DE ORDENAMIENTO (DRAG & DROP) AL ABRIR UN SOBRE
+// LÓGICA DE ORDENAMIENTO (DRAG & DROP) CON BOTÓN ESPECÍFICO (HANDLE)
 async function abrirSobre(autorId, autorNombre) {
     const modal = document.getElementById('modal-cards');
     const modalContent = document.getElementById('modal-content');
+    
+    // Cambiamos las instrucciones para reflejar el nuevo método
     const modalInstructions = document.getElementById('modal-instructions');
+    if (modalInstructions) {
+        modalInstructions.innerHTML = '<i class="fa-solid fa-hand-pointer mr-1"></i>Usa el botón de puntos en la esquina para ordenar';
+    }
+
     document.getElementById('modal-author-name').textContent = autorNombre;
     modalContent.innerHTML = '<div class="text-center py-10"><i class="fa-solid fa-spinner fa-spin text-3xl text-amber-500"></i></div>';
     modal.classList.remove('hidden');
 
     const isAdmin = auth.currentUser && auth.currentUser.email === ADMIN_EMAIL;
-    
-    // Muestra las instrucciones de mantener presionado si es Admin
-    if(isAdmin) { modalInstructions.classList.remove('hidden'); } 
-    else { modalInstructions.classList.add('hidden'); }
+    if(isAdmin && modalInstructions) { modalInstructions.classList.remove('hidden'); } 
+    else if (modalInstructions) { modalInstructions.classList.add('hidden'); }
 
     try {
         const querySnapshot = await getDocs(collection(db, `autores/${autorId}/cartillas`));
@@ -417,7 +414,6 @@ async function abrirSobre(autorId, autorNombre) {
         let cartillas = [];
         querySnapshot.forEach(docSnap => cartillas.push({ id: docSnap.id, ...docSnap.data() }));
 
-        // Ordenamiento inteligente: Protege las cartillas viejas (fecha) y usa el nuevo sistema (orden)
         cartillas.sort((a, b) => {
             const ordenA = a.orden !== undefined ? a.orden : (a.fecha ? -a.fecha.toMillis() : 0);
             const ordenB = b.orden !== undefined ? b.orden : (b.fecha ? -b.fecha.toMillis() : 0);
@@ -426,15 +422,16 @@ async function abrirSobre(autorId, autorNombre) {
 
         cartillas.forEach((cartilla) => {
             const cartillaId = cartilla.id;
-            // Se le agrega "cursor-grab" y el atributo "data-id" para el sistema Drag & Drop
-            let cardHtml = `<div class="bg-white p-6 rounded-xl shadow-md border border-gray-100 mb-6 relative pt-14 ${isAdmin ? 'cursor-grab active:cursor-grabbing' : ''}" data-id="${cartillaId}">`; 
+            let cardHtml = `<div class="bg-white p-6 rounded-xl shadow-md border border-gray-100 mb-6 relative pt-14" data-id="${cartillaId}">`; 
             
             if(isAdmin) {
                 cardHtml += `
-                <div class="absolute top-3 left-3 text-gray-300">
-                    <i class="fa-solid fa-grip-lines text-xl"></i>
+                <!-- NUEVO BOTÓN DE AGARRE (HANDLE) -->
+                <div class="drag-handle absolute top-3 left-3 w-9 h-9 flex items-center justify-center bg-slate-800 text-amber-400 rounded-full shadow-md cursor-grab active:cursor-grabbing z-20">
+                    <i class="fa-solid fa-grip-vertical text-sm"></i>
                 </div>
-                <div class="absolute top-3 right-3 flex space-x-2">
+                <!-- BOTONES DE EDICIÓN -->
+                <div class="absolute top-3 right-3 flex space-x-2 z-20">
                     <button class="btn-editar bg-blue-100 text-blue-600 w-9 h-9 rounded-full active:bg-blue-300 transition flex items-center justify-center shadow" data-autor="${autorId}" data-cartilla="${cartillaId}" title="Editar">
                         <i class="fa-solid fa-pen text-sm"></i>
                     </button>
@@ -450,16 +447,15 @@ async function abrirSobre(autorId, autorNombre) {
             modalContent.innerHTML += cardHtml;
         });
 
-        // INICIAR SORTABLEJS (Solo si es Admin)
+        // INICIAR SORTABLEJS (Vinculado exclusivamente al botón .drag-handle)
         if (isAdmin && typeof Sortable !== 'undefined') {
             new Sortable(modalContent, {
                 animation: 150,
-                delay: 200, // IMPORTANTE: Obliga a mantener presionado 200ms en el celular antes de mover
-                delayOnTouchOnly: true,
+                handle: '.drag-handle', // <--- LA CLAVE MÁGICA PARA MÓVILES
                 ghostClass: 'sortable-ghost',
                 onEnd: async function (evt) {
                     const cardElements = modalContent.querySelectorAll('div[data-id]');
-                    const batch = writeBatch(db); // Preparamos la actualización masiva
+                    const batch = writeBatch(db); 
                     
                     cardElements.forEach((el, index) => {
                         const cId = el.getAttribute('data-id');
@@ -468,7 +464,7 @@ async function abrirSobre(autorId, autorNombre) {
                     });
 
                     try {
-                        await batch.commit(); // Disparamos todas las actualizaciones a Firebase juntas
+                        await batch.commit(); 
                     } catch (error) {
                         alert("Error al guardar el nuevo orden.");
                     }
