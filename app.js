@@ -31,8 +31,10 @@ let imagenActualEditando = null;
 let idAutorPanelEditando = null; 
 let imagenAutorActualEditando = null;
 
-// NUEVO: Letrero de "No molestar" para evitar que Firebase colapse el Drag&Drop
-let isReorderingAutores = false;
+// Variables para limpiar el Drag & Drop y evitar bloqueos Zombi
+let sortableAutores = null;
+let sortableCartillas = null;
+let isReorderingAutores = false; // El candado
 
 // 4. Inicializar Editor de Texto (Quill)
 const quill = new Quill('#editor', {
@@ -42,7 +44,7 @@ const quill = new Quill('#editor', {
 });
 
 // -----------------------------------------------------------
-// 5. LÓGICA DE INDICADORES DE IMÁGENES (Cartilla y Autor)
+// 5. LÓGICA DE INDICADORES DE IMÁGENES
 // -----------------------------------------------------------
 
 const fileInput = document.getElementById('card-image');
@@ -203,6 +205,7 @@ onAuthStateChanged(auth, (user) => {
         guestSuggestions.classList.add('hidden');
     }
 });
+
 document.getElementById('btn-logout').addEventListener('click', async () => {
     await signOut(auth);
     window.location.reload(); 
@@ -308,7 +311,7 @@ document.getElementById('btn-add-card').addEventListener('click', async () => {
 
 // CARGAR AUTORES Y HABILITAR DRAG & DROP
 onSnapshot(collection(db, "autores"), (snapshot) => {
-    // MAGIA APLICADA: Si estás arrastrando una tarjeta, Firebase no borrará nada
+    // Si el candado está encendido, ignoramos el redibujado de Firebase temporalmente
     if (isReorderingAutores) return; 
 
     const selectAuthor = document.getElementById('select-author');
@@ -370,33 +373,38 @@ onSnapshot(collection(db, "autores"), (snapshot) => {
         grid.appendChild(envelopeDiv);
     });
 
+    // INICIAR SORTABLEJS
     if (isAdmin && typeof Sortable !== 'undefined') {
-        new Sortable(grid, {
+        if (sortableAutores) {
+            sortableAutores.destroy(); // Limpia la memoria del zombi
+        }
+        sortableAutores = new Sortable(grid, {
             animation: 150,
             handle: '.drag-handle-autor', 
             ghostClass: 'sortable-ghost',
             onStart: function (evt) {
-                // Encendemos el candado para que Firebase no borre la pantalla
-                isReorderingAutores = true; 
+                isReorderingAutores = true; // Cierra el candado al empezar a mover
             },
-            onEnd: async function (evt) {
-                const authorElements = grid.querySelectorAll('div[data-id]');
-                const batch = writeBatch(db); 
-                
-                authorElements.forEach((el, index) => {
-                    const aId = el.getAttribute('data-id');
-                    const docRef = doc(db, `autores/${aId}`);
-                    batch.update(docRef, { orden: index });
-                });
+            onEnd: function (evt) {
+                // El truco: Esperamos un instante a que termine la animación, abrimos el candado, y LUEGO actualizamos Firebase
+                setTimeout(async () => {
+                    isReorderingAutores = false; // Abre el candado
+                    
+                    const authorElements = grid.querySelectorAll('div[data-id]');
+                    const batch = writeBatch(db); 
+                    
+                    authorElements.forEach((el, index) => {
+                        const aId = el.getAttribute('data-id');
+                        const docRef = doc(db, `autores/${aId}`);
+                        batch.update(docRef, { orden: index });
+                    });
 
-                try {
-                    await batch.commit(); 
-                } catch (error) {
-                    alert("Error al guardar el nuevo orden de los autores.");
-                } finally {
-                    // Apagamos el candado después de 1 segundo
-                    setTimeout(() => { isReorderingAutores = false; }, 1000); 
-                }
+                    try {
+                        await batch.commit(); // Firebase actualiza todo de golpe, y como el candado está abierto, redibuja limpio.
+                    } catch (error) {
+                        alert("Error al guardar el nuevo orden de los autores.");
+                    }
+                }, 300);
             }
         });
     }
@@ -503,7 +511,10 @@ async function abrirSobre(autorId, autorNombre) {
         });
 
         if (isAdmin && typeof Sortable !== 'undefined') {
-            new Sortable(modalContent, {
+            if (sortableCartillas) {
+                sortableCartillas.destroy(); 
+            }
+            sortableCartillas = new Sortable(modalContent, {
                 animation: 150,
                 handle: '.drag-handle', 
                 ghostClass: 'sortable-ghost',
