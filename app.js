@@ -35,7 +35,7 @@ let sortableAutores = null;
 let sortableCartillas = null;
 let isReorderingAutores = false; 
 
-// NUEVO: Array para guardar a todos los autores y poder filtrarlos
+// NUEVO: Array en memoria para el buscador integrado
 let autoresMemoria = []; 
 
 // 4. Inicializar Editor de Texto (Quill)
@@ -46,7 +46,60 @@ const quill = new Quill('#editor', {
 });
 
 // -----------------------------------------------------------
-// 5. LÓGICA DE INDICADORES DE IMÁGENES
+// 5. LÓGICA DEL NUEVO BUSCADOR DE AUTORES (COMBOBOX)
+// -----------------------------------------------------------
+const searchInputVisual = document.getElementById('search-author-input');
+const hiddenInputId = document.getElementById('select-author');
+const dropdownList = document.getElementById('author-dropdown-list');
+
+// Al hacer clic, muestra la lista
+searchInputVisual.addEventListener('click', () => {
+    dropdownList.classList.remove('hidden');
+    renderizarDropdown('');
+});
+
+// Al escribir, filtra la lista
+searchInputVisual.addEventListener('input', (e) => {
+    dropdownList.classList.remove('hidden');
+    renderizarDropdown(e.target.value);
+    hiddenInputId.value = ''; // Borra el ID oculto si alteran el texto manualmente
+});
+
+// Cierra la lista si haces clic en otra parte de la pantalla
+document.addEventListener('click', (e) => {
+    if (!searchInputVisual.contains(e.target) && !dropdownList.contains(e.target)) {
+        dropdownList.classList.add('hidden');
+    }
+});
+
+// Función que dibuja los resultados de la búsqueda
+function renderizarDropdown(filtro = '') {
+    dropdownList.innerHTML = '';
+    const filtrados = autoresMemoria.filter(autor => autor.nombre.toLowerCase().includes(filtro.toLowerCase()));
+    
+    if (filtrados.length === 0) {
+        dropdownList.innerHTML = '<div class="p-3 text-sm text-gray-500 text-center">No se encontraron autores</div>';
+        return;
+    }
+
+    filtrados.forEach(autor => {
+        const item = document.createElement('div');
+        item.className = 'p-3 text-sm text-gray-700 hover:bg-amber-100 hover:text-amber-900 cursor-pointer border-b border-gray-100 last:border-0 font-medium transition-colors';
+        item.textContent = autor.nombre;
+        
+        // Al tocar un autor de la lista, lo seleccionamos
+        item.addEventListener('click', () => {
+            searchInputVisual.value = autor.nombre; 
+            hiddenInputId.value = autor.id;     
+            dropdownList.classList.add('hidden'); 
+        });
+        
+        dropdownList.appendChild(item);
+    });
+}
+
+// -----------------------------------------------------------
+// 6. LÓGICA DE INDICADORES DE IMÁGENES
 // -----------------------------------------------------------
 
 const fileInput = document.getElementById('card-image');
@@ -105,7 +158,7 @@ function resetearCajaImagenAutor() {
 }
 
 // -----------------------------------------------------------
-// 6. LÓGICA DE LA VENTANA DE AUTENTICACIÓN
+// 7. LÓGICA DE LA VENTANA DE AUTENTICACIÓN
 // -----------------------------------------------------------
 const authModal = document.getElementById('auth-modal');
 const formLogin = document.getElementById('form-login-section');
@@ -182,7 +235,7 @@ document.getElementById('btn-recover').addEventListener('click', async () => {
 });
 
 // -----------------------------------------------------------
-// 7. DETECCIÓN DE USUARIO
+// 8. DETECCIÓN DE USUARIO
 // -----------------------------------------------------------
 onAuthStateChanged(auth, (user) => {
     const adminPanel = document.getElementById('admin-panel');
@@ -214,30 +267,8 @@ document.getElementById('btn-logout').addEventListener('click', async () => {
 });
 
 // -----------------------------------------------------------
-// 8. LÓGICA DE AUTORES Y CARTILLAS
+// 9. LÓGICA DE AUTORES Y CARTILLAS
 // -----------------------------------------------------------
-
-// NUEVO: Función para dibujar y filtrar la cajita desplegable
-function renderizarSelectAutores(filtro = '') {
-    const selectAuthor = document.getElementById('select-author');
-    const valorActual = selectAuthor.value; 
-    
-    selectAuthor.innerHTML = '<option value="">Selecciona un Autor...</option>';
-    
-    const filtrados = autoresMemoria.filter(autor => autor.nombre.toLowerCase().includes(filtro.toLowerCase()));
-    
-    filtrados.forEach(autor => {
-        selectAuthor.innerHTML += `<option value="${autor.id}">${autor.nombre}</option>`;
-    });
-    
-    if (valorActual) selectAuthor.value = valorActual;
-}
-
-// NUEVO: Escuchador para la barra de búsqueda del autor
-document.getElementById('search-author-select').addEventListener('input', (e) => {
-    renderizarSelectAutores(e.target.value);
-});
-
 
 btnCancelAuthor.addEventListener('click', () => {
     idAutorPanelEditando = null;
@@ -294,7 +325,7 @@ document.getElementById('btn-add-card').addEventListener('click', async () => {
     const plainText = quill.getText().trim();
     const btn = document.getElementById('btn-add-card');
 
-    if (!authorId) return alert('Selecciona un autor.');
+    if (!authorId) return alert('Por favor, busca y selecciona un autor válido de la lista.');
     if (plainText === '' && fileInput.files.length === 0 && !imagenActualEditando) return alert('Debes agregar texto o imagen.');
 
     btn.disabled = true;
@@ -327,6 +358,11 @@ document.getElementById('btn-add-card').addEventListener('click', async () => {
 
         quill.root.innerHTML = ''; 
         resetearCajaImagen(); 
+        
+        // Limpia el buscador visual para la próxima cartilla
+        searchInputVisual.value = '';
+        hiddenInputId.value = '';
+
         btn.innerHTML = '<i class="fa-solid fa-paper-plane mr-2"></i>Guardar Cartilla';
         
     } catch (error) { alert('Error al guardar/actualizar.'); } 
@@ -351,9 +387,8 @@ onSnapshot(collection(db, "autores"), (snapshot) => {
         return ordenA - ordenB;
     });
 
-    // NUEVO: Cargar los autores en la memoria global y dibujar el selector
+    // Guardamos los autores en la memoria para que el buscador funcione
     autoresMemoria = autores;
-    renderizarSelectAutores(document.getElementById('search-author-select').value);
 
     autores.forEach((autor) => {
         const envelopeDiv = document.createElement('div');
@@ -469,12 +504,6 @@ onSnapshot(collection(db, "autores"), (snapshot) => {
                 } else { resetearCajaImagenAutor(); }
 
                 document.getElementById('btn-add-author').innerHTML = '<i class="fa-solid fa-save mr-2"></i>Actualizar Autor';
-                
-                // Mantenemos el filtro activo
-                document.getElementById('search-author-select').value = aData.nombre;
-                renderizarSelectAutores(aData.nombre);
-                document.getElementById('select-author').value = aId;
-
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             } catch (error) { alert('Error al preparar la edición del autor.'); }
         });
@@ -586,9 +615,11 @@ async function abrirSobre(autorId, autorNombre) {
                 idAutorEditando = aId;
                 imagenActualEditando = cData.imagen || null;
                 
-                document.getElementById('search-author-select').value = autorNombre;
-                renderizarSelectAutores(autorNombre);
-                document.getElementById('select-author').value = aId;
+                // Actualiza el buscador visualmente al editar
+                if(searchInputVisual) {
+                    searchInputVisual.value = autorNombre;
+                }
+                hiddenInputId.value = aId;
 
                 quill.root.innerHTML = cData.texto || '';
                 
@@ -609,7 +640,7 @@ async function abrirSobre(autorId, autorNombre) {
 }
 document.getElementById('btn-close-modal').addEventListener('click', () => document.getElementById('modal-cards').classList.add('hidden'));
 
-// 9. Enviar y LEER Sugerencias
+// 10. Enviar y LEER Sugerencias
 document.getElementById('btn-send-suggestion').addEventListener('click', async () => {
     const text = document.getElementById('suggestion-text').value;
     if (!text.trim()) return alert('Por favor escribe algo primero.');
