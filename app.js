@@ -16,7 +16,7 @@ const firebaseConfig = {
 // 3. >>> CONFIGURACIÓN DE CLOUDINARY Y PERMISOS <<<
 const CLOUDINARY_CLOUD_NAME = "fr8ult62"; // Ej: "dxyz123ab"
 const CLOUDINARY_UPLOAD_PRESET = "Literatura_preset"; // El nombre que le pusiste en el Paso 2
-const ADMIN_EMAIL = "gregoryplaza4@gmail.com"; 
+const ADMIN_EMAIL = "gregoryplaza4@gmail.com";
 
 // Inicializar
 const app = initializeApp(firebaseConfig);
@@ -130,7 +130,11 @@ document.getElementById('btn-login-email').addEventListener('click', async () =>
     const email = document.getElementById('login-email').value;
     const pass = document.getElementById('login-pass').value;
     if(!email || !pass) return alert("Completa ambos campos.");
-    try { await signInWithEmailAndPassword(auth, email, pass); authModal.classList.add('hidden'); } 
+    try { 
+        await signInWithEmailAndPassword(auth, email, pass); 
+        authModal.classList.add('hidden'); 
+        window.location.reload(); // Recarga la página para mostrar los botones de edición instantáneamente
+    } 
     catch (error) { alert("Error al iniciar sesión. Verifica tu correo y contraseña."); }
 });
 
@@ -139,6 +143,7 @@ const loginGoogle = async () => {
         const result = await signInWithPopup(auth, new GoogleAuthProvider());
         await setDoc(doc(db, "usuarios", result.user.uid), { nombre: result.user.displayName, email: result.user.email, metodo: "Google" }, { merge: true }); 
         authModal.classList.add('hidden');
+        window.location.reload(); // Recarga la página para mostrar los botones de edición instantáneamente
     } catch (error) { alert("El inicio de sesión fue cancelado o bloqueado."); }
 };
 document.getElementById('btn-login-google').addEventListener('click', loginGoogle);
@@ -170,7 +175,7 @@ document.getElementById('btn-recover').addEventListener('click', async () => {
 });
 
 // -----------------------------------------------------------
-// 7. DETECCIÓN DE USUARIO
+// 7. DETECCIÓN DE USUARIO Y CIERRE DE SESIÓN
 // -----------------------------------------------------------
 onAuthStateChanged(auth, (user) => {
     const adminPanel = document.getElementById('admin-panel');
@@ -195,10 +200,14 @@ onAuthStateChanged(auth, (user) => {
         guestSuggestions.classList.add('hidden');
     }
 });
-document.getElementById('btn-logout').addEventListener('click', () => signOut(auth));
+
+document.getElementById('btn-logout').addEventListener('click', async () => {
+    await signOut(auth);
+    window.location.reload(); // Recarga la página para quitar los botones de edición instantáneamente
+});
 
 // -----------------------------------------------------------
-// 8. LÓGICA DE AUTORES Y CARTILLAS (Crear, Editar y Eliminar)
+// 8. LÓGICA DE AUTORES Y CARTILLAS (Crear, Editar, Eliminar y ORDENAR)
 // -----------------------------------------------------------
 
 btnCancelAuthor.addEventListener('click', () => {
@@ -295,52 +304,97 @@ document.getElementById('btn-add-card').addEventListener('click', async () => {
     finally { btn.disabled = false; }
 });
 
-onSnapshot(query(collection(db, "autores"), orderBy("fechaCreacion", "asc")), (snapshot) => {
+// CARGAR AUTORES Y HABILITAR DRAG & DROP
+onSnapshot(collection(db, "autores"), (snapshot) => {
     const selectAuthor = document.getElementById('select-author');
     const grid = document.getElementById('envelopes-grid');
     selectAuthor.innerHTML = '<option value="">Selecciona un Autor...</option>';
     grid.innerHTML = '';
 
     const isAdmin = auth.currentUser && auth.currentUser.email === ADMIN_EMAIL;
+    
+    // Convertir a Array para poder ordenarlo inteligentemente en el cliente
+    let autores = [];
+    snapshot.forEach((docSnap) => { autores.push({ id: docSnap.id, ...docSnap.data() }); });
 
-    snapshot.forEach((docSnap) => {
-        const autor = docSnap.data();
-        selectAuthor.innerHTML += `<option value="${docSnap.id}">${autor.nombre}</option>`;
+    // Ordenar autores
+    autores.sort((a, b) => {
+        const ordenA = a.orden !== undefined ? a.orden : (a.fechaCreacion ? a.fechaCreacion.toMillis() : 0);
+        const ordenB = b.orden !== undefined ? b.orden : (b.fechaCreacion ? b.fechaCreacion.toMillis() : 0);
+        return ordenA - ordenB;
+    });
+
+    autores.forEach((autor) => {
+        selectAuthor.innerHTML += `<option value="${autor.id}">${autor.nombre}</option>`;
         
         const envelopeDiv = document.createElement('div');
         envelopeDiv.className = "bg-white p-6 rounded-2xl shadow-sm hover:shadow-xl border-t-4 border-amber-400 transition-all cursor-pointer flex flex-col items-center justify-center h-48 transform hover:-translate-y-1 relative group";
         
+        // Identificador crucial para guardar el nuevo orden
+        envelopeDiv.setAttribute('data-id', autor.id); 
+        
         let adminButtons = '';
         if (isAdmin) {
             adminButtons = `
+            <!-- BOTÓN DE AGARRE (DRAG HANDLE) PARA MOVER AUTOR -->
+            <div class="drag-handle-autor absolute top-3 left-3 w-8 h-8 flex items-center justify-center bg-slate-800 text-amber-400 rounded-full shadow-md cursor-grab active:cursor-grabbing z-20 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                <i class="fa-solid fa-grip-vertical text-xs"></i>
+            </div>
+            
             <div class="absolute top-3 right-3 flex space-x-2 z-10 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                <button class="btn-editar-autor bg-blue-100 text-blue-600 w-8 h-8 rounded-full active:bg-blue-300 hover:bg-blue-200 transition flex items-center justify-center shadow" data-autor="${docSnap.id}" title="Editar Autor">
+                <button class="btn-editar-autor bg-blue-100 text-blue-600 w-8 h-8 rounded-full active:bg-blue-300 hover:bg-blue-200 transition flex items-center justify-center shadow" data-autor="${autor.id}" title="Editar Autor">
                     <i class="fa-solid fa-pen text-xs"></i>
                 </button>
-                <button class="btn-eliminar-autor bg-red-100 text-red-600 w-8 h-8 rounded-full active:bg-red-300 hover:bg-red-200 transition flex items-center justify-center shadow" data-autor="${docSnap.id}" title="Eliminar Autor">
+                <button class="btn-eliminar-autor bg-red-100 text-red-600 w-8 h-8 rounded-full active:bg-red-300 hover:bg-red-200 transition flex items-center justify-center shadow" data-autor="${autor.id}" title="Eliminar Autor">
                     <i class="fa-solid fa-trash text-xs"></i>
                 </button>
             </div>`;
         }
 
         let iconoHtml = autor.imagenAutor
-            ? `<img src="${autor.imagenAutor}" alt="${autor.nombre}" class="w-16 h-16 rounded-full object-cover mb-3 shadow-md border-2 border-amber-200">`
-            : `<i class="fa-regular fa-envelope text-6xl text-slate-300 mb-3 group-hover:text-amber-500 transition-colors"></i>`;
+            ? `<img src="${autor.imagenAutor}" alt="${autor.nombre}" class="w-16 h-16 rounded-full object-cover mb-3 shadow-md border-2 border-amber-200 pointer-events-none">`
+            : `<i class="fa-regular fa-envelope text-6xl text-slate-300 mb-3 group-hover:text-amber-500 transition-colors pointer-events-none"></i>`;
 
         envelopeDiv.innerHTML = `
             ${adminButtons}
             ${iconoHtml}
-            <h3 class="text-lg font-bold text-slate-800 text-center font-serif">${autor.nombre}</h3>
-            <p class="text-xs text-slate-400 mt-2 uppercase tracking-widest">Abrir</p>
+            <h3 class="text-lg font-bold text-slate-800 text-center font-serif pointer-events-none">${autor.nombre}</h3>
+            <p class="text-xs text-slate-400 mt-2 uppercase tracking-widest pointer-events-none">Abrir</p>
         `;
         
         envelopeDiv.addEventListener('click', (e) => {
-            if (e.target.closest('button')) return;
-            abrirSobre(docSnap.id, autor.nombre);
+            // Evitar que el sobre se abra si tocaste un botón o el botón de arrastrar
+            if (e.target.closest('button') || e.target.closest('.drag-handle-autor')) return;
+            abrirSobre(autor.id, autor.nombre);
         });
         
         grid.appendChild(envelopeDiv);
     });
+
+    // INICIAR SORTABLEJS PARA LOS AUTORES
+    if (isAdmin && typeof Sortable !== 'undefined') {
+        new Sortable(grid, {
+            animation: 150,
+            handle: '.drag-handle-autor', // Exclusivo del botón de puntitos
+            ghostClass: 'sortable-ghost',
+            onEnd: async function (evt) {
+                const authorElements = grid.querySelectorAll('div[data-id]');
+                const batch = writeBatch(db); 
+                
+                authorElements.forEach((el, index) => {
+                    const aId = el.getAttribute('data-id');
+                    const docRef = doc(db, `autores/${aId}`);
+                    batch.update(docRef, { orden: index });
+                });
+
+                try {
+                    await batch.commit(); 
+                } catch (error) {
+                    alert("Error al guardar el nuevo orden de los autores.");
+                }
+            }
+        });
+    }
 
     document.querySelectorAll('.btn-eliminar-autor').forEach(btn => {
         btn.addEventListener('click', async (e) => {
@@ -387,12 +441,11 @@ onSnapshot(query(collection(db, "autores"), orderBy("fechaCreacion", "asc")), (s
     });
 });
 
-// LÓGICA DE ORDENAMIENTO (DRAG & DROP) CON BOTÓN ESPECÍFICO (HANDLE)
+// LÓGICA DE ORDENAMIENTO (DRAG & DROP) DE CARTILLAS AL ABRIR UN SOBRE
 async function abrirSobre(autorId, autorNombre) {
     const modal = document.getElementById('modal-cards');
     const modalContent = document.getElementById('modal-content');
     
-    // Cambiamos las instrucciones para reflejar el nuevo método
     const modalInstructions = document.getElementById('modal-instructions');
     if (modalInstructions) {
         modalInstructions.innerHTML = '<i class="fa-solid fa-hand-pointer mr-1"></i>Usa el botón de puntos en la esquina para ordenar';
@@ -426,11 +479,9 @@ async function abrirSobre(autorId, autorNombre) {
             
             if(isAdmin) {
                 cardHtml += `
-                <!-- NUEVO BOTÓN DE AGARRE (HANDLE) -->
                 <div class="drag-handle absolute top-3 left-3 w-9 h-9 flex items-center justify-center bg-slate-800 text-amber-400 rounded-full shadow-md cursor-grab active:cursor-grabbing z-20">
                     <i class="fa-solid fa-grip-vertical text-sm"></i>
                 </div>
-                <!-- BOTONES DE EDICIÓN -->
                 <div class="absolute top-3 right-3 flex space-x-2 z-20">
                     <button class="btn-editar bg-blue-100 text-blue-600 w-9 h-9 rounded-full active:bg-blue-300 transition flex items-center justify-center shadow" data-autor="${autorId}" data-cartilla="${cartillaId}" title="Editar">
                         <i class="fa-solid fa-pen text-sm"></i>
@@ -447,11 +498,10 @@ async function abrirSobre(autorId, autorNombre) {
             modalContent.innerHTML += cardHtml;
         });
 
-        // INICIAR SORTABLEJS (Vinculado exclusivamente al botón .drag-handle)
         if (isAdmin && typeof Sortable !== 'undefined') {
             new Sortable(modalContent, {
                 animation: 150,
-                handle: '.drag-handle', // <--- LA CLAVE MÁGICA PARA MÓVILES
+                handle: '.drag-handle', 
                 ghostClass: 'sortable-ghost',
                 onEnd: async function (evt) {
                     const cardElements = modalContent.querySelectorAll('div[data-id]');
