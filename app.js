@@ -27,13 +27,17 @@ const auth = getAuth(app);
 let idCartillaEditando = null;
 let idAutorEditando = null;
 let imagenActualEditando = null; 
+
 let idAutorPanelEditando = null; 
 let imagenAutorActualEditando = null;
+
 let sortableAutores = null;
 let sortableCartillas = null;
 let isReorderingAutores = false; 
+
 let autoresMemoria = []; 
 
+// Función protectora de fechas
 const getOrderValue = (docData, field) => {
     if (docData.orden !== undefined) return docData.orden;
     if (!docData[field]) return 0;
@@ -553,37 +557,36 @@ async function abrirSobre(autorId, autorNombre) {
 
         cartillas.forEach((cartilla) => {
             const cartillaId = cartilla.id;
-            let cardHtml = `<div class="bg-white p-6 rounded-xl shadow-md border border-gray-100 mb-6 relative pt-12 cartilla-container" data-id="${cartillaId}">`; 
+            
+            // LA TARJETA PRINCIPAL (Ahora es la que se fotografía completa)
+            let cardHtml = `<div class="bg-white p-6 rounded-2xl shadow-lg border border-gray-100 mb-8 relative pt-14 cartilla-container transition-all" data-id="${cartillaId}">`; 
             
             if(isAdmin) {
                 cardHtml += `
-                <div class="drag-handle absolute top-3 left-3 w-9 h-9 flex items-center justify-center bg-slate-800 text-amber-400 rounded-full shadow-md cursor-grab active:cursor-grabbing z-20">
+                <div class="admin-buttons drag-handle absolute top-4 left-4 w-9 h-9 flex items-center justify-center bg-slate-800 text-amber-400 rounded-full shadow-sm cursor-grab active:cursor-grabbing z-20">
                     <i class="fa-solid fa-grip-vertical text-sm"></i>
                 </div>
-                <div class="absolute top-3 right-3 flex space-x-2 z-20">
-                    <button class="btn-editar bg-blue-100 text-blue-600 w-9 h-9 rounded-full active:bg-blue-300 transition flex items-center justify-center shadow" data-autor="${autorId}" data-cartilla="${cartillaId}" title="Editar">
+                <div class="admin-buttons absolute top-4 right-4 flex space-x-2 z-20">
+                    <button class="btn-editar bg-blue-50 text-blue-600 w-9 h-9 rounded-full hover:bg-blue-200 transition flex items-center justify-center shadow-sm" data-autor="${autorId}" data-cartilla="${cartillaId}" title="Editar">
                         <i class="fa-solid fa-pen text-sm"></i>
                     </button>
-                    <button class="btn-eliminar bg-red-100 text-red-600 w-9 h-9 rounded-full active:bg-red-300 transition flex items-center justify-center shadow" data-autor="${autorId}" data-cartilla="${cartillaId}" title="Eliminar">
+                    <button class="btn-eliminar bg-red-50 text-red-600 w-9 h-9 rounded-full hover:bg-red-200 transition flex items-center justify-center shadow-sm" data-autor="${autorId}" data-cartilla="${cartillaId}" title="Eliminar">
                         <i class="fa-solid fa-trash text-sm"></i>
                     </button>
                 </div>`;
             }
             
-            // NUEVO: Contenedor específico que será "fotografiado" (Ignora los botones de arriba)
-            cardHtml += `<div class="capturable-content bg-white p-2 rounded-lg">`;
-            // ATENCIÓN: El atributo crossorigin="anonymous" es vital para descargar imágenes de la nube
-            if (cartilla.imagen) cardHtml += `<img src="${cartilla.imagen}" crossorigin="anonymous" class="w-full max-h-96 object-contain rounded-lg mb-4 bg-gray-50 pointer-events-none">`;
-            if (cartilla.texto) cardHtml += `<div class="ql-editor p-0">${cartilla.texto}</div>`;
-            cardHtml += `</div>`; 
-
-            // NUEVO: Botones públicos de Acción (Descargar y Compartir)
+            // Contenido visual
+            if (cartilla.imagen) cardHtml += `<img src="${cartilla.imagen}" crossorigin="anonymous" class="w-full max-h-[30rem] object-contain rounded-xl mb-4 bg-gray-50 pointer-events-none">`;
+            if (cartilla.texto) cardHtml += `<div class="ql-editor p-0 w-full text-center">${cartilla.texto}</div>`;
+            
+            // Botones de acción
             cardHtml += `
-            <div class="flex justify-end space-x-3 mt-4 border-t border-gray-100 pt-4">
-                <button class="btn-descargar flex items-center bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-bold hover:bg-gray-200 transition shadow-sm" data-id="${cartillaId}">
+            <div class="action-buttons flex justify-center space-x-3 mt-6 border-t border-gray-100 pt-5">
+                <button class="btn-descargar flex items-center bg-gray-100 text-gray-700 px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-gray-200 transition shadow-sm" data-id="${cartillaId}">
                     <i class="fa-solid fa-download mr-2"></i>Descargar
                 </button>
-                <button class="btn-compartir flex items-center bg-amber-100 text-amber-800 px-4 py-2 rounded-lg text-sm font-bold hover:bg-amber-200 transition shadow-sm" data-id="${cartillaId}">
+                <button class="btn-compartir flex items-center bg-amber-100 text-amber-800 px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-amber-200 transition shadow-sm" data-id="${cartillaId}">
                     <i class="fa-solid fa-share-nodes mr-2"></i>Compartir
                 </button>
             </div>`;
@@ -593,19 +596,39 @@ async function abrirSobre(autorId, autorNombre) {
             modalContent.innerHTML += cardHtml;
         });
 
-        // Eventos para Descargar Imagen
+        // =================================================================
+        // LA MAGIA: Descargar la tarjeta completa ocultando los botones
+        // =================================================================
         document.querySelectorAll('.btn-descargar').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 const btnElem = e.currentTarget;
                 const cId = btnElem.dataset.id;
-                const container = document.querySelector(`.cartilla-container[data-id="${cId}"] .capturable-content`);
+                const container = document.querySelector(`.cartilla-container[data-id="${cId}"]`);
                 
                 const originalHtml = btnElem.innerHTML;
-                btnElem.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Cargando...';
+                btnElem.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Generando...';
                 btnElem.disabled = true;
 
+                // 1. Identificar botones a ocultar
+                const actionBtns = container.querySelector('.action-buttons');
+                const topBtns = container.querySelectorAll('.admin-buttons');
+
+                // 2. Ocultar botones y ajustar padding temporalmente para crear un marco simétrico
+                if(actionBtns) actionBtns.classList.add('hidden');
+                topBtns.forEach(b => b.classList.add('hidden'));
+                container.classList.remove('pt-14'); // Quitamos el espacio de arriba que ocupaban los botones
+                container.classList.add('py-8'); // Añadimos padding parejo arriba y abajo
+
                 try {
-                    const canvas = await html2canvas(container, { useCORS: true, backgroundColor: '#ffffff', scale: 2 });
+                    // Esperamos 50ms para asegurarnos de que el navegador aplicó las clases de ocultar
+                    await new Promise(r => setTimeout(r, 50)); 
+                    
+                    const canvas = await html2canvas(container, { 
+                        useCORS: true, 
+                        backgroundColor: null, // "null" mantiene transparentes las esquinas redondeadas
+                        scale: 2 // Alta calidad
+                    });
+                    
                     const link = document.createElement('a');
                     link.download = `Literatura_${autorNombre.replace(/\s+/g, '_')}.png`;
                     link.href = canvas.toDataURL('image/png');
@@ -613,25 +636,48 @@ async function abrirSobre(autorId, autorNombre) {
                 } catch (error) {
                     alert("No se pudo generar la imagen. Intenta de nuevo.");
                 } finally {
+                    // 3. Restaurar la tarjeta a la normalidad
+                    if(actionBtns) actionBtns.classList.remove('hidden');
+                    topBtns.forEach(b => b.classList.remove('hidden'));
+                    container.classList.remove('py-8');
+                    container.classList.add('pt-14');
+                    
                     btnElem.innerHTML = originalHtml;
                     btnElem.disabled = false;
                 }
             });
         });
 
-        // Eventos para Compartir Imagen (Redes sociales / WhatsApp)
+        // =================================================================
+        // LA MAGIA: Compartir la tarjeta completa ocultando los botones
+        // =================================================================
         document.querySelectorAll('.btn-compartir').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 const btnElem = e.currentTarget;
                 const cId = btnElem.dataset.id;
-                const container = document.querySelector(`.cartilla-container[data-id="${cId}"] .capturable-content`);
+                const container = document.querySelector(`.cartilla-container[data-id="${cId}"]`);
                 
                 const originalHtml = btnElem.innerHTML;
                 btnElem.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Preparando...';
                 btnElem.disabled = true;
 
+                const actionBtns = container.querySelector('.action-buttons');
+                const topBtns = container.querySelectorAll('.admin-buttons');
+
+                if(actionBtns) actionBtns.classList.add('hidden');
+                topBtns.forEach(b => b.classList.add('hidden'));
+                container.classList.remove('pt-14');
+                container.classList.add('py-8');
+
                 try {
-                    const canvas = await html2canvas(container, { useCORS: true, backgroundColor: '#ffffff', scale: 2 });
+                    await new Promise(r => setTimeout(r, 50)); 
+                    
+                    const canvas = await html2canvas(container, { 
+                        useCORS: true, 
+                        backgroundColor: null, 
+                        scale: 2 
+                    });
+                    
                     canvas.toBlob(async (blob) => {
                         const file = new File([blob], `Literatura_${autorNombre}.png`, { type: 'image/png' });
                         
@@ -639,7 +685,7 @@ async function abrirSobre(autorId, autorNombre) {
                             await navigator.share({
                                 files: [file],
                                 title: 'Literatura',
-                                text: `Mira esta frase increíble de ${autorNombre} en Literatura.`,
+                                text: `Mira esta increíble frase de ${autorNombre} en mi Colección.`,
                             });
                         } else {
                             alert("Tu dispositivo no soporta compartir imágenes de forma directa. Por favor, usa el botón de Descargar.");
@@ -648,6 +694,11 @@ async function abrirSobre(autorId, autorNombre) {
                 } catch (error) {
                     alert("No se pudo preparar la imagen para compartir.");
                 } finally {
+                    if(actionBtns) actionBtns.classList.remove('hidden');
+                    topBtns.forEach(b => b.classList.remove('hidden'));
+                    container.classList.remove('py-8');
+                    container.classList.add('pt-14');
+                    
                     btnElem.innerHTML = originalHtml;
                     btnElem.disabled = false;
                 }
@@ -695,7 +746,10 @@ async function abrirSobre(autorId, autorNombre) {
                 idAutorEditando = aId;
                 imagenActualEditando = cData.imagen || null;
                 
-                if(searchInputVisual) searchInputVisual.value = autorNombre;
+                if(searchInputVisual) {
+                    searchInputVisual.value = autorNombre;
+                    renderizarDropdown(autorNombre);
+                }
                 if(hiddenInputId) hiddenInputId.value = aId;
 
                 quill.root.innerHTML = cData.texto || '';
