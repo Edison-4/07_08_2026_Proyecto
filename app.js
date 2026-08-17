@@ -23,20 +23,24 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-// Variables globales de Edición
+// Variables globales
 let idCartillaEditando = null;
 let idAutorEditando = null;
 let imagenActualEditando = null; 
-
 let idAutorPanelEditando = null; 
 let imagenAutorActualEditando = null;
-
 let sortableAutores = null;
 let sortableCartillas = null;
 let isReorderingAutores = false; 
-
-// NUEVO: Array en memoria para el buscador integrado
 let autoresMemoria = []; 
+
+const getOrderValue = (docData, field) => {
+    if (docData.orden !== undefined) return docData.orden;
+    if (!docData[field]) return 0;
+    if (typeof docData[field].toMillis === 'function') return docData[field].toMillis();
+    if (typeof docData[field].getTime === 'function') return docData[field].getTime();
+    return 0;
+};
 
 // 4. Inicializar Editor de Texto (Quill)
 const quill = new Quill('#editor', {
@@ -46,36 +50,39 @@ const quill = new Quill('#editor', {
 });
 
 // -----------------------------------------------------------
-// 5. LÓGICA DEL NUEVO BUSCADOR DE AUTORES (COMBOBOX)
+// 5. LÓGICA DEL BUSCADOR DE AUTORES
 // -----------------------------------------------------------
 const searchInputVisual = document.getElementById('search-author-input');
 const hiddenInputId = document.getElementById('select-author');
 const dropdownList = document.getElementById('author-dropdown-list');
 
-// Al hacer clic, muestra la lista
-searchInputVisual.addEventListener('click', () => {
-    dropdownList.classList.remove('hidden');
-    renderizarDropdown('');
-});
+if (searchInputVisual && dropdownList) {
+    searchInputVisual.addEventListener('click', () => {
+        dropdownList.classList.remove('hidden');
+        renderizarDropdown('');
+    });
 
-// Al escribir, filtra la lista
-searchInputVisual.addEventListener('input', (e) => {
-    dropdownList.classList.remove('hidden');
-    renderizarDropdown(e.target.value);
-    hiddenInputId.value = ''; // Borra el ID oculto si alteran el texto manualmente
-});
+    searchInputVisual.addEventListener('input', (e) => {
+        dropdownList.classList.remove('hidden');
+        renderizarDropdown(e.target.value);
+        if (hiddenInputId) hiddenInputId.value = ''; 
+    });
 
-// Cierra la lista si haces clic en otra parte de la pantalla
-document.addEventListener('click', (e) => {
-    if (!searchInputVisual.contains(e.target) && !dropdownList.contains(e.target)) {
-        dropdownList.classList.add('hidden');
-    }
-});
+    document.addEventListener('click', (e) => {
+        if (!searchInputVisual.contains(e.target) && !dropdownList.contains(e.target)) {
+            dropdownList.classList.add('hidden');
+        }
+    });
+}
 
-// Función que dibuja los resultados de la búsqueda
 function renderizarDropdown(filtro = '') {
+    if (!dropdownList) return;
     dropdownList.innerHTML = '';
-    const filtrados = autoresMemoria.filter(autor => autor.nombre.toLowerCase().includes(filtro.toLowerCase()));
+    
+    const filtrados = autoresMemoria.filter(autor => {
+        const nombreAutor = autor.nombre || '';
+        return nombreAutor.toLowerCase().includes(filtro.toLowerCase());
+    });
     
     if (filtrados.length === 0) {
         dropdownList.innerHTML = '<div class="p-3 text-sm text-gray-500 text-center">No se encontraron autores</div>';
@@ -85,12 +92,11 @@ function renderizarDropdown(filtro = '') {
     filtrados.forEach(autor => {
         const item = document.createElement('div');
         item.className = 'p-3 text-sm text-gray-700 hover:bg-amber-100 hover:text-amber-900 cursor-pointer border-b border-gray-100 last:border-0 font-medium transition-colors';
-        item.textContent = autor.nombre;
+        item.textContent = autor.nombre || 'Autor sin nombre';
         
-        // Al tocar un autor de la lista, lo seleccionamos
         item.addEventListener('click', () => {
-            searchInputVisual.value = autor.nombre; 
-            hiddenInputId.value = autor.id;     
+            if (searchInputVisual) searchInputVisual.value = autor.nombre; 
+            if (hiddenInputId) hiddenInputId.value = autor.id;     
             dropdownList.classList.add('hidden'); 
         });
         
@@ -101,7 +107,6 @@ function renderizarDropdown(filtro = '') {
 // -----------------------------------------------------------
 // 6. LÓGICA DE INDICADORES DE IMÁGENES
 // -----------------------------------------------------------
-
 const fileInput = document.getElementById('card-image');
 const uploadPlaceholder = document.getElementById('upload-placeholder');
 const filePreview = document.getElementById('file-preview');
@@ -136,25 +141,31 @@ const fileNameDisplayAutor = document.getElementById('file-name-author');
 const btnRemoveImageAutor = document.getElementById('btn-remove-image-author');
 const btnCancelAuthor = document.getElementById('btn-cancel-author');
 
-fileInputAutor.addEventListener('change', (e) => {
-    if (e.target.files.length > 0) {
-        fileNameDisplayAutor.textContent = e.target.files[0].name;
-        uploadPlaceholderAutor.classList.add('hidden');
-        filePreviewAutor.classList.remove('hidden');
-        filePreviewAutor.classList.add('flex');
-        btnRemoveImageAutor.classList.remove('hidden');
-    }
-});
+if(fileInputAutor) {
+    fileInputAutor.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            fileNameDisplayAutor.textContent = e.target.files[0].name;
+            uploadPlaceholderAutor.classList.add('hidden');
+            filePreviewAutor.classList.remove('hidden');
+            filePreviewAutor.classList.add('flex');
+            btnRemoveImageAutor.classList.remove('hidden');
+        }
+    });
+}
 
-btnRemoveImageAutor.addEventListener('click', () => resetearCajaImagenAutor());
+if(btnRemoveImageAutor) {
+    btnRemoveImageAutor.addEventListener('click', () => resetearCajaImagenAutor());
+}
 
 function resetearCajaImagenAutor() {
-    fileInputAutor.value = ''; 
+    if(fileInputAutor) fileInputAutor.value = ''; 
     imagenAutorActualEditando = null; 
-    uploadPlaceholderAutor.classList.remove('hidden');
-    filePreviewAutor.classList.add('hidden');
-    filePreviewAutor.classList.remove('flex');
-    btnRemoveImageAutor.classList.add('hidden');
+    if(uploadPlaceholderAutor) uploadPlaceholderAutor.classList.remove('hidden');
+    if(filePreviewAutor) {
+        filePreviewAutor.classList.add('hidden');
+        filePreviewAutor.classList.remove('flex');
+    }
+    if(btnRemoveImageAutor) btnRemoveImageAutor.classList.add('hidden');
 }
 
 // -----------------------------------------------------------
@@ -247,17 +258,17 @@ onAuthStateChanged(auth, (user) => {
         btnOpenAuth.classList.add('hidden');
         btnLogout.classList.remove('hidden');
         if (user.email === ADMIN_EMAIL) {
-            adminPanel.classList.remove('hidden');
-            guestSuggestions.classList.add('hidden');
+            if(adminPanel) adminPanel.classList.remove('hidden');
+            if(guestSuggestions) guestSuggestions.classList.add('hidden');
         } else {
-            adminPanel.classList.add('hidden');
-            guestSuggestions.classList.remove('hidden');
+            if(adminPanel) adminPanel.classList.add('hidden');
+            if(guestSuggestions) guestSuggestions.classList.remove('hidden');
         }
     } else {
         btnOpenAuth.classList.remove('hidden');
         btnLogout.classList.add('hidden');
-        adminPanel.classList.add('hidden');
-        guestSuggestions.classList.add('hidden');
+        if(adminPanel) adminPanel.classList.add('hidden');
+        if(guestSuggestions) guestSuggestions.classList.add('hidden');
     }
 });
 
@@ -269,15 +280,16 @@ document.getElementById('btn-logout').addEventListener('click', async () => {
 // -----------------------------------------------------------
 // 9. LÓGICA DE AUTORES Y CARTILLAS
 // -----------------------------------------------------------
-
-btnCancelAuthor.addEventListener('click', () => {
-    idAutorPanelEditando = null;
-    document.getElementById('titulo-panel-autor').textContent = '1. Crear Nuevo Autor';
-    document.getElementById('author-name').value = '';
-    document.getElementById('btn-add-author').innerHTML = '<i class="fa-solid fa-plus mr-2"></i>Crear Autor';
-    btnCancelAuthor.classList.add('hidden');
-    resetearCajaImagenAutor();
-});
+if(btnCancelAuthor) {
+    btnCancelAuthor.addEventListener('click', () => {
+        idAutorPanelEditando = null;
+        document.getElementById('titulo-panel-autor').textContent = '1. Crear Nuevo Autor';
+        document.getElementById('author-name').value = '';
+        document.getElementById('btn-add-author').innerHTML = '<i class="fa-solid fa-plus mr-2"></i>Crear Autor';
+        btnCancelAuthor.classList.add('hidden');
+        resetearCajaImagenAutor();
+    });
+}
 
 document.getElementById('btn-add-author').addEventListener('click', async () => {
     const input = document.getElementById('author-name');
@@ -289,7 +301,7 @@ document.getElementById('btn-add-author').addEventListener('click', async () => 
 
     try {
         let imageUrl = null;
-        if (fileInputAutor.files.length > 0) {
+        if (fileInputAutor && fileInputAutor.files.length > 0) {
             const formData = new FormData();
             formData.append('file', fileInputAutor.files[0]);
             formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
@@ -307,7 +319,7 @@ document.getElementById('btn-add-author').addEventListener('click', async () => 
             alert('Autor actualizado correctamente.');
             idAutorPanelEditando = null;
             document.getElementById('titulo-panel-autor').textContent = '1. Crear Nuevo Autor';
-            btnCancelAuthor.classList.add('hidden');
+            if(btnCancelAuthor) btnCancelAuthor.classList.add('hidden');
         } else {
             await addDoc(collection(db, "autores"), { nombre: input.value.trim(), imagenAutor: imageUrl, fechaCreacion: new Date() });
             alert('Autor creado exitosamente.');
@@ -320,20 +332,20 @@ document.getElementById('btn-add-author').addEventListener('click', async () => 
 });
 
 document.getElementById('btn-add-card').addEventListener('click', async () => {
-    const authorId = document.getElementById('select-author').value;
+    const authorId = hiddenInputId ? hiddenInputId.value : (document.getElementById('select-author') ? document.getElementById('select-author').value : null);
     const textHtml = quill.root.innerHTML;
     const plainText = quill.getText().trim();
     const btn = document.getElementById('btn-add-card');
 
     if (!authorId) return alert('Por favor, busca y selecciona un autor válido de la lista.');
-    if (plainText === '' && fileInput.files.length === 0 && !imagenActualEditando) return alert('Debes agregar texto o imagen.');
+    if (plainText === '' && (!fileInput || fileInput.files.length === 0) && !imagenActualEditando) return alert('Debes agregar texto o imagen.');
 
     btn.disabled = true;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Procesando...';
 
     try {
         let imageUrl = null;
-        if (fileInput.files.length > 0) {
+        if (fileInput && fileInput.files.length > 0) {
             const formData = new FormData();
             formData.append('file', fileInput.files[0]);
             formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
@@ -359,9 +371,8 @@ document.getElementById('btn-add-card').addEventListener('click', async () => {
         quill.root.innerHTML = ''; 
         resetearCajaImagen(); 
         
-        // Limpia el buscador visual para la próxima cartilla
-        searchInputVisual.value = '';
-        hiddenInputId.value = '';
+        if (searchInputVisual) searchInputVisual.value = '';
+        if (hiddenInputId) hiddenInputId.value = '';
 
         btn.innerHTML = '<i class="fa-solid fa-paper-plane mr-2"></i>Guardar Cartilla';
         
@@ -370,10 +381,12 @@ document.getElementById('btn-add-card').addEventListener('click', async () => {
 });
 
 
+// DIBUJAR AUTORES
 onSnapshot(collection(db, "autores"), (snapshot) => {
     if (isReorderingAutores) return; 
 
     const grid = document.getElementById('envelopes-grid');
+    if (!grid) return; 
     grid.innerHTML = '';
 
     const isAdmin = auth.currentUser && auth.currentUser.email === ADMIN_EMAIL;
@@ -382,12 +395,11 @@ onSnapshot(collection(db, "autores"), (snapshot) => {
     snapshot.forEach((docSnap) => { autores.push({ id: docSnap.id, ...docSnap.data() }); });
 
     autores.sort((a, b) => {
-        const ordenA = a.orden !== undefined ? a.orden : (a.fechaCreacion ? a.fechaCreacion.toMillis() : 0);
-        const ordenB = b.orden !== undefined ? b.orden : (b.fechaCreacion ? b.fechaCreacion.toMillis() : 0);
+        const ordenA = getOrderValue(a, 'fechaCreacion');
+        const ordenB = getOrderValue(b, 'fechaCreacion');
         return ordenA - ordenB;
     });
 
-    // Guardamos los autores en la memoria para que el buscador funcione
     autoresMemoria = autores;
 
     autores.forEach((autor) => {
@@ -412,54 +424,44 @@ onSnapshot(collection(db, "autores"), (snapshot) => {
             </div>`;
         }
 
+        let nombreVisual = autor.nombre || 'Autor';
         let iconoHtml = autor.imagenAutor
-            ? `<img src="${autor.imagenAutor}" alt="${autor.nombre}" class="w-16 h-16 rounded-full object-cover mb-3 shadow-md border-2 border-amber-200 pointer-events-none">`
+            ? `<img src="${autor.imagenAutor}" alt="${nombreVisual}" class="w-16 h-16 rounded-full object-cover mb-3 shadow-md border-2 border-amber-200 pointer-events-none">`
             : `<i class="fa-regular fa-envelope text-6xl text-slate-300 mb-3 group-hover:text-amber-500 transition-colors pointer-events-none"></i>`;
 
         envelopeDiv.innerHTML = `
             ${adminButtons}
             ${iconoHtml}
-            <h3 class="text-lg font-bold text-slate-800 text-center font-serif pointer-events-none">${autor.nombre}</h3>
+            <h3 class="text-lg font-bold text-slate-800 text-center font-serif pointer-events-none">${nombreVisual}</h3>
             <p class="text-xs text-slate-400 mt-2 uppercase tracking-widest pointer-events-none">Abrir</p>
         `;
         
         envelopeDiv.addEventListener('click', (e) => {
             if (e.target.closest('button') || e.target.closest('.drag-handle-autor')) return;
-            abrirSobre(autor.id, autor.nombre);
+            abrirSobre(autor.id, nombreVisual);
         });
         
         grid.appendChild(envelopeDiv);
     });
 
     if (isAdmin && typeof Sortable !== 'undefined') {
-        if (sortableAutores) {
-            sortableAutores.destroy(); 
-        }
+        if (sortableAutores) { sortableAutores.destroy(); }
         sortableAutores = new Sortable(grid, {
             animation: 150,
             handle: '.drag-handle-autor', 
             ghostClass: 'sortable-ghost',
-            onStart: function (evt) {
-                isReorderingAutores = true; 
-            },
-            onEnd: function (evt) {
+            onStart: function () { isReorderingAutores = true; },
+            onEnd: function () {
                 setTimeout(async () => {
                     isReorderingAutores = false; 
-                    
                     const authorElements = grid.querySelectorAll('div[data-id]');
                     const batch = writeBatch(db); 
                     
                     authorElements.forEach((el, index) => {
                         const aId = el.getAttribute('data-id');
-                        const docRef = doc(db, `autores/${aId}`);
-                        batch.update(docRef, { orden: index });
+                        batch.update(doc(db, `autores/${aId}`), { orden: index });
                     });
-
-                    try {
-                        await batch.commit(); 
-                    } catch (error) {
-                        alert("Error al guardar el nuevo orden de los autores.");
-                    }
+                    try { await batch.commit(); } catch (error) { console.error(error); }
                 }, 300);
             }
         });
@@ -469,7 +471,7 @@ onSnapshot(collection(db, "autores"), (snapshot) => {
         btn.addEventListener('click', async (e) => {
             e.stopPropagation();
             const aId = e.currentTarget.dataset.autor;
-            if(confirm('¿Seguro que deseas eliminar a este autor y TODAS sus cartillas? Esta acción es permanente.')) {
+            if(confirm('¿Seguro que deseas eliminar a este autor y TODAS sus cartillas?')) {
                 try {
                     const cartillasSnap = await getDocs(collection(db, `autores/${aId}/cartillas`));
                     cartillasSnap.forEach(async (cDoc) => { await deleteDoc(doc(db, `autores/${aId}/cartillas/${cDoc.id}`)); });
@@ -492,20 +494,28 @@ onSnapshot(collection(db, "autores"), (snapshot) => {
                 imagenAutorActualEditando = aData.imagenAutor || null;
                 
                 document.getElementById('titulo-panel-autor').textContent = '1. Editando Autor';
-                document.getElementById('author-name').value = aData.nombre;
-                btnCancelAuthor.classList.remove('hidden');
+                document.getElementById('author-name').value = aData.nombre || '';
+                if(btnCancelAuthor) btnCancelAuthor.classList.remove('hidden');
                 
-                if (imagenAutorActualEditando) {
+                if (imagenAutorActualEditando && fileNameDisplayAutor) {
                     fileNameDisplayAutor.textContent = "📷 Foto actual (Guardada)";
-                    uploadPlaceholderAutor.classList.add('hidden');
-                    filePreviewAutor.classList.remove('hidden');
-                    filePreviewAutor.classList.add('flex');
-                    btnRemoveImageAutor.classList.remove('hidden');
+                    if(uploadPlaceholderAutor) uploadPlaceholderAutor.classList.add('hidden');
+                    if(filePreviewAutor) {
+                        filePreviewAutor.classList.remove('hidden');
+                        filePreviewAutor.classList.add('flex');
+                    }
+                    if(btnRemoveImageAutor) btnRemoveImageAutor.classList.remove('hidden');
                 } else { resetearCajaImagenAutor(); }
 
                 document.getElementById('btn-add-author').innerHTML = '<i class="fa-solid fa-save mr-2"></i>Actualizar Autor';
+                
+                if(searchInputVisual) {
+                    searchInputVisual.value = aData.nombre || '';
+                }
+                if(hiddenInputId) hiddenInputId.value = aId;
+
                 window.scrollTo({ top: 0, behavior: 'smooth' });
-            } catch (error) { alert('Error al preparar la edición del autor.'); }
+            } catch (error) { alert('Error al editar autor.'); }
         });
     });
 });
@@ -536,14 +546,14 @@ async function abrirSobre(autorId, autorNombre) {
         querySnapshot.forEach(docSnap => cartillas.push({ id: docSnap.id, ...docSnap.data() }));
 
         cartillas.sort((a, b) => {
-            const ordenA = a.orden !== undefined ? a.orden : (a.fecha ? -a.fecha.toMillis() : 0);
-            const ordenB = b.orden !== undefined ? b.orden : (b.fecha ? -b.fecha.toMillis() : 0);
+            const ordenA = getOrderValue(a, 'fecha');
+            const ordenB = getOrderValue(b, 'fecha');
             return ordenA - ordenB;
         });
 
         cartillas.forEach((cartilla) => {
             const cartillaId = cartilla.id;
-            let cardHtml = `<div class="bg-white p-6 rounded-xl shadow-md border border-gray-100 mb-6 relative pt-14" data-id="${cartillaId}">`; 
+            let cardHtml = `<div class="bg-white p-6 rounded-xl shadow-md border border-gray-100 mb-6 relative pt-12 cartilla-container" data-id="${cartillaId}">`; 
             
             if(isAdmin) {
                 cardHtml += `
@@ -559,36 +569,106 @@ async function abrirSobre(autorId, autorNombre) {
                     </button>
                 </div>`;
             }
-            if (cartilla.imagen) cardHtml += `<img src="${cartilla.imagen}" class="w-full max-h-96 object-contain rounded-lg mb-4 bg-gray-100 pointer-events-none">`;
+            
+            // NUEVO: Contenedor específico que será "fotografiado" (Ignora los botones de arriba)
+            cardHtml += `<div class="capturable-content bg-white p-2 rounded-lg">`;
+            // ATENCIÓN: El atributo crossorigin="anonymous" es vital para descargar imágenes de la nube
+            if (cartilla.imagen) cardHtml += `<img src="${cartilla.imagen}" crossorigin="anonymous" class="w-full max-h-96 object-contain rounded-lg mb-4 bg-gray-50 pointer-events-none">`;
             if (cartilla.texto) cardHtml += `<div class="ql-editor p-0">${cartilla.texto}</div>`;
+            cardHtml += `</div>`; 
+
+            // NUEVO: Botones públicos de Acción (Descargar y Compartir)
+            cardHtml += `
+            <div class="flex justify-end space-x-3 mt-4 border-t border-gray-100 pt-4">
+                <button class="btn-descargar flex items-center bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-bold hover:bg-gray-200 transition shadow-sm" data-id="${cartillaId}">
+                    <i class="fa-solid fa-download mr-2"></i>Descargar
+                </button>
+                <button class="btn-compartir flex items-center bg-amber-100 text-amber-800 px-4 py-2 rounded-lg text-sm font-bold hover:bg-amber-200 transition shadow-sm" data-id="${cartillaId}">
+                    <i class="fa-solid fa-share-nodes mr-2"></i>Compartir
+                </button>
+            </div>`;
+
             cardHtml += `</div>`;
             
             modalContent.innerHTML += cardHtml;
         });
 
+        // Eventos para Descargar Imagen
+        document.querySelectorAll('.btn-descargar').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const btnElem = e.currentTarget;
+                const cId = btnElem.dataset.id;
+                const container = document.querySelector(`.cartilla-container[data-id="${cId}"] .capturable-content`);
+                
+                const originalHtml = btnElem.innerHTML;
+                btnElem.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Cargando...';
+                btnElem.disabled = true;
+
+                try {
+                    const canvas = await html2canvas(container, { useCORS: true, backgroundColor: '#ffffff', scale: 2 });
+                    const link = document.createElement('a');
+                    link.download = `Literatura_${autorNombre.replace(/\s+/g, '_')}.png`;
+                    link.href = canvas.toDataURL('image/png');
+                    link.click();
+                } catch (error) {
+                    alert("No se pudo generar la imagen. Intenta de nuevo.");
+                } finally {
+                    btnElem.innerHTML = originalHtml;
+                    btnElem.disabled = false;
+                }
+            });
+        });
+
+        // Eventos para Compartir Imagen (Redes sociales / WhatsApp)
+        document.querySelectorAll('.btn-compartir').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const btnElem = e.currentTarget;
+                const cId = btnElem.dataset.id;
+                const container = document.querySelector(`.cartilla-container[data-id="${cId}"] .capturable-content`);
+                
+                const originalHtml = btnElem.innerHTML;
+                btnElem.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Preparando...';
+                btnElem.disabled = true;
+
+                try {
+                    const canvas = await html2canvas(container, { useCORS: true, backgroundColor: '#ffffff', scale: 2 });
+                    canvas.toBlob(async (blob) => {
+                        const file = new File([blob], `Literatura_${autorNombre}.png`, { type: 'image/png' });
+                        
+                        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                            await navigator.share({
+                                files: [file],
+                                title: 'Literatura',
+                                text: `Mira esta frase increíble de ${autorNombre} en Literatura.`,
+                            });
+                        } else {
+                            alert("Tu dispositivo no soporta compartir imágenes de forma directa. Por favor, usa el botón de Descargar.");
+                        }
+                    }, 'image/png');
+                } catch (error) {
+                    alert("No se pudo preparar la imagen para compartir.");
+                } finally {
+                    btnElem.innerHTML = originalHtml;
+                    btnElem.disabled = false;
+                }
+            });
+        });
+
         if (isAdmin && typeof Sortable !== 'undefined') {
-            if (sortableCartillas) {
-                sortableCartillas.destroy(); 
-            }
+            if (sortableCartillas) { sortableCartillas.destroy(); }
             sortableCartillas = new Sortable(modalContent, {
                 animation: 150,
                 handle: '.drag-handle', 
                 ghostClass: 'sortable-ghost',
-                onEnd: async function (evt) {
-                    const cardElements = modalContent.querySelectorAll('div[data-id]');
+                onEnd: async function () {
+                    const cardElements = modalContent.querySelectorAll('.cartilla-container');
                     const batch = writeBatch(db); 
                     
                     cardElements.forEach((el, index) => {
                         const cId = el.getAttribute('data-id');
-                        const docRef = doc(db, `autores/${autorId}/cartillas/${cId}`);
-                        batch.update(docRef, { orden: index });
+                        batch.update(doc(db, `autores/${autorId}/cartillas/${cId}`), { orden: index });
                     });
-
-                    try {
-                        await batch.commit(); 
-                    } catch (error) {
-                        alert("Error al guardar el nuevo orden.");
-                    }
+                    try { await batch.commit(); } catch (error) { console.error(error); }
                 }
             });
         }
@@ -615,11 +695,8 @@ async function abrirSobre(autorId, autorNombre) {
                 idAutorEditando = aId;
                 imagenActualEditando = cData.imagen || null;
                 
-                // Actualiza el buscador visualmente al editar
-                if(searchInputVisual) {
-                    searchInputVisual.value = autorNombre;
-                }
-                hiddenInputId.value = aId;
+                if(searchInputVisual) searchInputVisual.value = autorNombre;
+                if(hiddenInputId) hiddenInputId.value = aId;
 
                 quill.root.innerHTML = cData.texto || '';
                 

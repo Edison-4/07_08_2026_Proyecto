@@ -9,6 +9,8 @@
     <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    <!-- NUEVO: Librería para convertir la cartilla en Imagen -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         .ql-container { font-size: 16px; font-family: inherit; }
         .ql-editor { min-height: 150px; }
@@ -119,7 +121,6 @@
             <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 shadow-sm">
                 <h3 class="font-bold text-sm text-slate-500 uppercase mb-3">2. Agregar Cartilla</h3>
                 
-                <!-- NUEVO: SELECTOR DE AUTOR INTEGRADO CON BUSCADOR -->
                 <label class="block mb-1 text-sm font-semibold text-gray-700">Seleccionar Autor</label>
                 <div class="relative mb-4">
                     <input type="hidden" id="select-author">
