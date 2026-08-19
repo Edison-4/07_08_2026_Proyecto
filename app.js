@@ -523,98 +523,6 @@ onSnapshot(collection(db, "autores"), (snapshot) => {
     });
 });
 
-// ====================================================================
-// MAGIA: FUNCIÓN PARA GENERAR EL CLON PERFECTO (Basado en tu dibujo)
-// ====================================================================
-async function generarImagenCartilla(cId, autorNombre, esCompartir, btnElem) {
-    const originalHtml = btnElem.innerHTML;
-    btnElem.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>' + (esCompartir ? 'Preparando...' : 'Generando...');
-    btnElem.disabled = true;
-
-    try {
-        const containerOriginal = document.querySelector(`.cartilla-container[data-id="${cId}"]`);
-        const imgElement = containerOriginal.querySelector('img');
-        const textElement = containerOriginal.querySelector('.ql-editor');
-
-        // Crear el clon invisible en el fondo con estructura perfecta (420px de ancho fijo)
-        const clon = document.createElement('div');
-        clon.style.position = 'absolute';
-        clon.style.left = '-9999px'; 
-        clon.style.top = '0';
-        clon.style.width = '420px'; 
-        clon.style.backgroundColor = '#ffffff';
-        clon.style.borderRadius = '24px';
-        clon.style.padding = '32px'; 
-        clon.style.display = 'flex';
-        clon.style.flexDirection = 'column';
-        clon.style.alignItems = 'center';
-        clon.style.fontFamily = 'system-ui, -apple-system, sans-serif'; 
-        
-        let contenidoHtml = '';
-        if (imgElement) {
-            contenidoHtml += `<img src="${imgElement.src}" crossorigin="anonymous" style="width: 100%; border-radius: 12px; margin-bottom: 24px; object-fit: contain; max-height: 350px;">`;
-        }
-        if (textElement) {
-            // Forzamos un tamaño de letra más pequeño (15px) y un excelente centrado e interlineado
-            contenidoHtml += `<div style="text-align: center; font-size: 15px; line-height: 1.8; color: #1f2937; width: 100%;">
-                ${textElement.innerHTML}
-            </div>`;
-        }
-        
-        clon.innerHTML = contenidoHtml;
-        
-        // Estilizar perfectamente los fondos de texto amarillos que pones en el editor
-        const estilosQuill = clon.querySelectorAll('span[style*="background-color"]');
-        estilosQuill.forEach(el => {
-            el.style.padding = '2px 6px';
-            el.style.borderRadius = '4px';
-            el.style.boxDecorationBreak = 'clone';
-        });
-
-        document.body.appendChild(clon);
-
-        // Darle 150ms al navegador para que dibuje el clon invisible correctamente
-        await new Promise(r => setTimeout(r, 150));
-
-        const canvas = await html2canvas(clon, {
-            useCORS: true,
-            backgroundColor: null, // Descarga la imagen con esquinas redondas y fondo transparente
-            scale: 2 // Escala doble para máxima calidad en celulares
-        });
-
-        document.body.removeChild(clon); 
-
-        // Descargar o Compartir
-        if (esCompartir) {
-            canvas.toBlob(async (blob) => {
-                const file = new File([blob], `Literatura_${autorNombre.replace(/\s+/g, '_')}.png`, { type: 'image/png' });
-                if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                    await navigator.share({
-                        files: [file],
-                        title: 'Literatura',
-                        text: `Mira esta increíble frase de ${autorNombre} en mi Colección.`,
-                    });
-                } else {
-                    alert("Tu dispositivo no soporta compartir imágenes de forma directa. Por favor, usa el botón de Descargar.");
-                }
-            }, 'image/png');
-        } else {
-            const link = document.createElement('a');
-            link.download = `Literatura_${autorNombre.replace(/\s+/g, '_')}.png`;
-            link.href = canvas.toDataURL('image/png');
-            link.click();
-        }
-
-    } catch (error) {
-        console.error("Error al procesar la imagen:", error);
-        alert("No se pudo procesar la cartilla. Intenta de nuevo.");
-    } finally {
-        btnElem.innerHTML = originalHtml;
-        btnElem.disabled = false;
-    }
-}
-
-
 async function abrirSobre(autorId, autorNombre) {
     const modal = document.getElementById('modal-cards');
     const modalContent = document.getElementById('modal-content');
@@ -649,56 +557,28 @@ async function abrirSobre(autorId, autorNombre) {
         cartillas.forEach((cartilla) => {
             const cartillaId = cartilla.id;
             
-            // UI Estándar
-            let cardHtml = `<div class="bg-white p-6 rounded-2xl shadow-lg border border-gray-100 mb-8 relative pt-14 cartilla-container transition-all" data-id="${cartillaId}">`; 
+            // LA TARJETA RESTAURADA A SU ESTADO ORIGINAL LIMPIO Y PROFESIONAL
+            let cardHtml = `<div class="bg-white p-6 rounded-xl shadow-md border border-gray-100 mb-6 relative pt-14" data-id="${cartillaId}">`; 
             
             if(isAdmin) {
                 cardHtml += `
-                <div class="admin-buttons drag-handle absolute top-4 left-4 w-9 h-9 flex items-center justify-center bg-slate-800 text-amber-400 rounded-full shadow-sm cursor-grab active:cursor-grabbing z-20">
+                <div class="drag-handle absolute top-3 left-3 w-9 h-9 flex items-center justify-center bg-slate-800 text-amber-400 rounded-full shadow-md cursor-grab active:cursor-grabbing z-20">
                     <i class="fa-solid fa-grip-vertical text-sm"></i>
                 </div>
-                <div class="admin-buttons absolute top-4 right-4 flex space-x-2 z-20">
-                    <button class="btn-editar bg-blue-50 text-blue-600 w-9 h-9 rounded-full hover:bg-blue-200 transition flex items-center justify-center shadow-sm" data-autor="${autorId}" data-cartilla="${cartillaId}" title="Editar">
+                <div class="absolute top-3 right-3 flex space-x-2 z-20">
+                    <button class="btn-editar bg-blue-100 text-blue-600 w-9 h-9 rounded-full active:bg-blue-300 transition flex items-center justify-center shadow" data-autor="${autorId}" data-cartilla="${cartillaId}" title="Editar">
                         <i class="fa-solid fa-pen text-sm"></i>
                     </button>
-                    <button class="btn-eliminar bg-red-50 text-red-600 w-9 h-9 rounded-full hover:bg-red-200 transition flex items-center justify-center shadow-sm" data-autor="${autorId}" data-cartilla="${cartillaId}" title="Eliminar">
+                    <button class="btn-eliminar bg-red-100 text-red-600 w-9 h-9 rounded-full active:bg-red-300 transition flex items-center justify-center shadow" data-autor="${autorId}" data-cartilla="${cartillaId}" title="Eliminar">
                         <i class="fa-solid fa-trash text-sm"></i>
                     </button>
                 </div>`;
             }
-            
-            if (cartilla.imagen) cardHtml += `<img src="${cartilla.imagen}" crossorigin="anonymous" class="w-full max-h-[30rem] object-contain rounded-xl mb-4 bg-gray-50 pointer-events-none">`;
-            if (cartilla.texto) cardHtml += `<div class="ql-editor p-0 w-full text-center md:text-lg">${cartilla.texto}</div>`;
-            
-            // Botones de acción públicos
-            cardHtml += `
-            <div class="action-buttons flex justify-center space-x-3 mt-6 border-t border-gray-100 pt-5">
-                <button class="btn-descargar flex items-center bg-gray-100 text-gray-700 px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-gray-200 transition shadow-sm" data-id="${cartillaId}">
-                    <i class="fa-solid fa-download mr-2"></i>Descargar
-                </button>
-                <button class="btn-compartir flex items-center bg-amber-100 text-amber-800 px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-amber-200 transition shadow-sm" data-id="${cartillaId}">
-                    <i class="fa-solid fa-share-nodes mr-2"></i>Compartir
-                </button>
-            </div>`;
-
+            if (cartilla.imagen) cardHtml += `<img src="${cartilla.imagen}" class="w-full max-h-96 object-contain rounded-lg mb-4 bg-gray-100 pointer-events-none">`;
+            if (cartilla.texto) cardHtml += `<div class="ql-editor p-0">${cartilla.texto}</div>`;
             cardHtml += `</div>`;
             
             modalContent.innerHTML += cardHtml;
-        });
-
-        // Activamos las nuevas funciones de Generar Imagen
-        document.querySelectorAll('.btn-descargar').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const cId = e.currentTarget.dataset.id;
-                generarImagenCartilla(cId, autorNombre, false, e.currentTarget);
-            });
-        });
-
-        document.querySelectorAll('.btn-compartir').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const cId = e.currentTarget.dataset.id;
-                generarImagenCartilla(cId, autorNombre, true, e.currentTarget);
-            });
         });
 
         if (isAdmin && typeof Sortable !== 'undefined') {
@@ -708,7 +588,7 @@ async function abrirSobre(autorId, autorNombre) {
                 handle: '.drag-handle', 
                 ghostClass: 'sortable-ghost',
                 onEnd: async function () {
-                    const cardElements = modalContent.querySelectorAll('.cartilla-container');
+                    const cardElements = modalContent.querySelectorAll('div[data-id]');
                     const batch = writeBatch(db); 
                     
                     cardElements.forEach((el, index) => {
@@ -831,4 +711,3 @@ document.getElementById('btn-open-suggestions').addEventListener('click', async 
 document.getElementById('btn-close-suggestions').addEventListener('click', () => {
     document.getElementById('modal-suggestions').classList.add('hidden');
 });
-
